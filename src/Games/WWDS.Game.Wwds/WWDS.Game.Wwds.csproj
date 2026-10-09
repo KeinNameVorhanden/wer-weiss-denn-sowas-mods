@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Game adapter for both "Wer weiß denn sowas?" games. Their Assembly-CSharp is identical except for
+    two irrelevant types, so one engine adapter serves both; per-game data lives in GameProfile.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.Game.Wwds</RootNamespace>
+    <WwdsNeedsGame>true</WwdsNeedsGame>
+    <WwdsNeedsBepInEx>true</WwdsNeedsBepInEx>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+    <ProjectReference Include="..\..\Core\WWDS.Runtime\WWDS.Runtime.csproj" />
+  </ItemGroup>
+</Project>

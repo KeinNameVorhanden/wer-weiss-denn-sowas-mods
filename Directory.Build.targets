@@ -1,0 +1,15 @@
+<Project>
+  <!-- Single source of truth for the version: Directory.Build.props <Version> becomes a compile-time
+       constant WWDS.WwdsVersion.Value in every project (attributes like [BepInPlugin] need a const). -->
+  <Target Name="WwdsGenerateVersion" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <WwdsVersionFile>$(IntermediateOutputPath)WwdsVersion.g.cs</WwdsVersionFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(WwdsVersionFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace WWDS { internal static class WwdsVersion { public const string Value = &quot;$(Version)&quot;%3B } }" />
+    <ItemGroup>
+      <Compile Include="$(WwdsVersionFile)" />
+      <FileWrites Include="$(WwdsVersionFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Wire protocol between the in-game harness (net35) and the companion bridge (net8):
+    newline-delimited JSON objects over a localhost TCP connection.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35;netstandard2.0</TargetFrameworks>
+    <RootNamespace>WWDS.Protocol</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+  </ItemGroup>
+</Project>

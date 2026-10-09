@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Loader- and Unity-independent core. net35 runs in-game; netstandard2.0 serves tests and the bridge. -->
+  <PropertyGroup>
+    <TargetFrameworks>net35;netstandard2.0</TargetFrameworks>
+    <RootNamespace>WWDS.ModCore</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WWDS.Tests" />
+  </ItemGroup>
+</Project>

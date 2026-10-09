@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Companion app (out of process). Owns Twitch OAuth and tokens, EventSub WebSocket and Helix calls via
+    TwitchLib, and serves the in-game harness over localhost TCP. Also hosts the mock audience.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>WWDS.Bridge</RootNamespace>
+    <AssemblyName>WWDS.Bridge</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TwitchLib.EventSub.Websockets" Version="0.8.0" />
+    <PackageReference Include="TwitchLib.Api" Version="3.10.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Twitch\WWDS.Protocol\WWDS.Protocol.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WWDS.Tests" />
+  </ItemGroup>
+
+  <!--
+    Optional Client ID of a Twitch application (Client Type: Public) baked into a release build, so players
+    can log in without registering their own app. Set WwdsTwitchClientId as an environment variable, in
+    build/local.props (not committed) or with tools/Package-Release.ps1 -TwitchClientId. A Client ID is
+    public by design (it is sent in every login URL); never put a client secret here, none is needed.
+  -->
+  <Target Name="WwdsGenerateBuiltInTwitch" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <WwdsTwitchClientId>$([System.String]::Copy('$(WwdsTwitchClientId)').Trim())</WwdsTwitchClientId>
+      <WwdsBuiltInTwitchFile>$(IntermediateOutputPath)BuiltInTwitch.g.cs</WwdsBuiltInTwitchFile>
+    </PropertyGroup>
+    <Error Condition="'$(WwdsTwitchClientId)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('$(WwdsTwitchClientId)', '^[a-z0-9]{20,40}$'))"
+           Text="WwdsTwitchClientId does not look like a Twitch Client ID (20-40 lowercase letters and digits)." />
+    <WriteLinesToFile File="$(WwdsBuiltInTwitchFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace WWDS.Bridge { internal static class BuiltInTwitch { public const string ClientId = &quot;$(WwdsTwitchClientId)&quot;%3B } }" />
+    <ItemGroup>
+      <Compile Include="$(WwdsBuiltInTwitchFile)" />
+      <FileWrites Include="$(WwdsBuiltInTwitchFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

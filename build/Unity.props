@@ -1,0 +1,25 @@
+<Project>
+  <!-- Import in projects that need UnityEngine, the game assemblies, BepInEx or HarmonyX (net35 only). -->
+  <ItemGroup>
+    <Reference Include="UnityEngine" HintPath="$(GameRefDir)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GameRefDir)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(GameRefDir)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(GameRefDir)\UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UI" HintPath="$(GameRefDir)\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="UnityEngine.UIModule" HintPath="$(GameRefDir)\UnityEngine.UIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(GameRefDir)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(GameRefDir)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputModule" HintPath="$(GameRefDir)\UnityEngine.InputModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GameRefDir)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(GameRefDir)\UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GameRefDir)\UnityEngine.AssetBundleModule.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(WwdsNeedsGame)' == 'true'">
+    <Reference Include="Assembly-CSharp" HintPath="$(GameRefDir)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="Assembly-CSharp-firstpass" HintPath="$(GameRefDir)\Assembly-CSharp-firstpass.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(WwdsNeedsBepInEx)' == 'true'">
+    <Reference Include="BepInEx" HintPath="$(BepInExCoreDir)\BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExCoreDir)\0Harmony.dll" Private="false" />
+  </ItemGroup>
+</Project>

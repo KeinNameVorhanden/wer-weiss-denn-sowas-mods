@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The only BepInEx-specific assembly: config/log backends, Unity update pump, game detection,
+    adapter selection and feature registration. A MelonLoader host would mirror this project.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.Host.BepInEx</RootNamespace>
+    <AssemblyName>WWDS.Host.BepInEx</AssemblyName>
+    <WwdsNeedsBepInEx>true</WwdsNeedsBepInEx>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+    <ProjectReference Include="..\..\Core\WWDS.Runtime\WWDS.Runtime.csproj" />
+    <ProjectReference Include="..\..\Games\WWDS.Game.Wwds\WWDS.Game.Wwds.csproj" />
+    <ProjectReference Include="..\..\Games\WWDS.Game.Wwds.Mods\WWDS.Game.Wwds.Mods.csproj" />
+    <ProjectReference Include="..\..\Features\WWDS.Features\WWDS.Features.csproj" />
+    <ProjectReference Include="..\..\Twitch\WWDS.Twitch\WWDS.Twitch.csproj" />
+    <ProjectReference Include="..\..\Audience\WWDS.Audience\WWDS.Audience.csproj" />
+    <ProjectReference Include="..\..\UI\WWDS.UI\WWDS.UI.csproj" />
+  </ItemGroup>
+</Project>

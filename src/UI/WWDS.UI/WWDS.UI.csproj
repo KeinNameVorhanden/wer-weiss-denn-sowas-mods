@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- In-game IMGUI overlay: harness control panel and stream HUD. Unity only, no game or loader types. -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.UI</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+    <ProjectReference Include="..\..\Audience\WWDS.Audience\WWDS.Audience.csproj" />
+  </ItemGroup>
+</Project>

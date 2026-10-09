@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Unity + HarmonyX helpers shared by every in-game assembly, independent of the mod loader and of
+    any specific game: patch registry, reflection binder, Unity clock, coroutine helpers.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.Runtime</RootNamespace>
+    <WwdsNeedsBepInEx>true</WwdsNeedsBepInEx>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\WWDS.ModCore\WWDS.ModCore.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Diagnostic probe plugin (milestone 4). Observes the game through Harmony patches and writes a
+    JSONL trace. Optional autopilot runs bot-vs-bot shows for unattended runtime validation.
+    Deliberately independent of the harness assemblies so it can run on its own.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.Diagnostics</RootNamespace>
+    <WwdsNeedsGame>true</WwdsNeedsGame>
+    <WwdsNeedsBepInEx>true</WwdsNeedsBepInEx>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+</Project>

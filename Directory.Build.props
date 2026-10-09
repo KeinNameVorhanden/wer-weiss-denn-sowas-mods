@@ -1,0 +1,45 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.14.1</Version>
+    <Authors>WWDS Harness contributors</Authors>
+    <Product>WWDS Modding Harness</Product>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+  </PropertyGroup>
+
+  <Import Project="build\local.props" Condition="Exists('$(MSBuildThisFileDirectory)build\local.props')" />
+
+  <!--
+    In-game assemblies target net35 and compile against the game's own Mono class libraries
+    (mscorlib 2.0 / System.Core 3.5). This guarantees we only use APIs that exist at runtime and
+    avoids a separate reference-assembly download. Game 1 is the reference install; Game 2 has the
+    same API surface.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net35'">
+    <GameRefDir Condition="'$(Game1Dir)' != ''">$(Game1Dir)\Wer Weiß Denn Sowas_Data\Managed</GameRefDir>
+    <GameRefDir Condition="'$(GameRefDir)' == '' and '$(Game2Dir)' != ''">$(Game2Dir)\WWDS2_Data\Managed</GameRefDir>
+    <BepInExCoreDir Condition="'$(Game1Dir)' != ''">$(Game1Dir)\BepInEx\core</BepInExCoreDir>
+    <BepInExCoreDir Condition="'$(BepInExCoreDir)' == '' and '$(Game2Dir)' != ''">$(Game2Dir)\BepInEx\core</BepInExCoreDir>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(GameRefDir)</FrameworkPathOverride>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <DefineConstants>$(DefineConstants);WWDS_NET35</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net35'">
+    <Reference Include="mscorlib" HintPath="$(GameRefDir)\mscorlib.dll" Private="false" />
+    <Reference Include="System" HintPath="$(GameRefDir)\System.dll" Private="false" />
+    <Reference Include="System.Core" HintPath="$(GameRefDir)\System.Core.dll" Private="false" />
+  </ItemGroup>
+
+  <Target Name="WwdsCheckGameRefs" BeforeTargets="ResolveAssemblyReferences" Condition="'$(TargetFramework)' == 'net35'">
+    <Error Condition="'$(GameRefDir)' == '' or !Exists('$(GameRefDir)\mscorlib.dll')"
+           Text="Game install not found. Run: pwsh tools/Find-Games.ps1 (writes build/local.props)." />
+  </Target>
+</Project>

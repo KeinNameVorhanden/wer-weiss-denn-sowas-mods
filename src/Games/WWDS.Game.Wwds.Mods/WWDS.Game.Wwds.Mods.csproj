@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Player-facing mods for both "Wer weiß denn sowas?" games: game-styled uGUI kit, mod menu, ESC menu,
+    skip intro, quickplay and mouse support. Needs the game assembly (TMPro, InControl, DoozyUI live in
+    Assembly-CSharp) and HarmonyX.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net35</TargetFrameworks>
+    <RootNamespace>WWDS.Game.Wwds.Mods</RootNamespace>
+    <WwdsNeedsGame>true</WwdsNeedsGame>
+    <WwdsNeedsBepInEx>true</WwdsNeedsBepInEx>
+  </PropertyGroup>
+  <Import Project="$(RepoRoot)build\Unity.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+    <ProjectReference Include="..\..\Core\WWDS.Runtime\WWDS.Runtime.csproj" />
+    <ProjectReference Include="..\..\Audience\WWDS.Audience\WWDS.Audience.csproj" />
+    <ProjectReference Include="..\..\Twitch\WWDS.Twitch\WWDS.Twitch.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Core\WWDS.ModCore\WWDS.ModCore.csproj" />
+    <ProjectReference Include="..\..\src\Twitch\WWDS.Protocol\WWDS.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\Twitch\WWDS.Twitch\WWDS.Twitch.csproj" />
+    <ProjectReference Include="..\..\src\Features\WWDS.Features\WWDS.Features.csproj" />
+    <ProjectReference Include="..\..\src\Bridge\WWDS.Bridge\WWDS.Bridge.csproj" />
+    <ProjectReference Include="..\..\src\Audience\WWDS.Audience\WWDS.Audience.csproj" />
+  </ItemGroup>
+</Project>

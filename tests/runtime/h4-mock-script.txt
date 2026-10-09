@@ -1,0 +1,20 @@
+# Mock audience traffic for runtime validation H4 (bridge --mock --script).
+# Warm-up, then a channel-point redemption that the shipped bindings.json maps to a naming round,
+# then a steady loop of traffic matching every interaction kind: names (accepted only while a naming
+# round is open, including two that moderation must reject), votes as letters and numbers (opponent
+# decisions), guesses, and a moderator status command.
+wait 45
+mark
+redeem viewer7 "Name the Opponent"
+crowd 6 name QuizMaster "Elton Fan" Bernhardiner
+chat trollboy !name <b>http://spam.example</b>
+chat trollboy2 !name N4zi
+crowd 3 guess A B
+wait 5
+votes A=4 B=2 C=1 vote
+crowd 4 vote 1 2 3
+wait 5
+votes B=5 C=2 vote
+mod moddy !wwds status
+wait 5
+loop

@@ -1,0 +1,32 @@
+# Decompiled / extracted game content (copyrighted, never commit)
+_re/
+_extract/
+
+# Local game references copied for building (copyrighted, never commit)
+lib/game1/
+lib/game2/
+lib/unity/
+
+# Downloaded third-party tooling
+_downloads/
+
+# Build output
+bin/
+obj/
+artifacts/
+dist/
+*.user
+.vs/
+.idea/
+TestResults/
+
+# Local secrets and runtime config
+*.secrets.json
+secrets/
+token*.json
+
+# Machine-specific build paths (tools/Find-Games.ps1)
+build/local.props
+
+# Private developer notes (reverse engineering, plan, test log): never published
+_devnotes/
