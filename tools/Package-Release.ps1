@@ -18,7 +18,7 @@ $version = $props.Project.PropertyGroup[0].Version
 $staged = & (Join-Path $PSScriptRoot 'Stage-Payload.ps1') -Configuration $Configuration -TwitchClientId $TwitchClientId
 $staged | Where-Object { $_ -like 'Twitch Client ID*' }
 
-$name = "WWDS-Harness-$version"
+$name = "WWDS-Mods-$version"
 $out = Join-Path $root "dist\$name"
 if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
 New-Item -ItemType Directory -Force $out | Out-Null

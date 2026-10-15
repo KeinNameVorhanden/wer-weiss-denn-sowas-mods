@@ -1,0 +1,40 @@
+# Unit tests and the Twitch bridge on every push and pull request.
+# The in-game plugins compile against the games' own assemblies, which are never part of this repository,
+# so they are built locally (tools/Publish-Release.ps1) and not here.
+# Kept small on purpose: one job, newer runs cancel older ones, no caches or artifacts to store.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Unit tests
+        run: dotnet test tests/WWDS.Tests/WWDS.Tests.csproj -c Release --nologo
+
+      - name: Twitch bridge
+        run: dotnet build src/Bridge/WWDS.Bridge/WWDS.Bridge.csproj -c Release --nologo
+
+      - name: Text encoding
+        run: python tools/check_text.py .

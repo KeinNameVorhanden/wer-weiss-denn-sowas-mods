@@ -33,7 +33,7 @@ Comfort mods and Twitch audience play for the PC games **"Wer weiß denn sowas? 
 
 ## Install
 
-1. Download the release zip and unpack it anywhere.
+1. Download the latest zip from [Releases](https://github.com/KeinNameVorhanden/wer-weiss-denn-sowas-mods/releases) and unpack it anywhere.
 2. Close the games and double-click **`Install.cmd`**.
 
 The setup finds both games through Steam, installs [BepInEx](https://github.com/BepInEx/BepInEx) 5.4.23.5
@@ -74,7 +74,8 @@ pwsh build.ps1
 `Find-Games.ps1` writes the game paths to `build/local.props` (machine-specific, not committed).
 `build.ps1` builds, runs the unit tests and stages the payload; `tools/Deploy-ToGames.ps1` installs it,
 `tools/Package-Release.ps1` builds the release zip (optionally with your Twitch app's Client ID built in,
-see [docs/twitch-setup.md](docs/twitch-setup.md)). `tools/Run-ModsSelfTest.ps1` runs an unattended,
+see [docs/twitch-setup.md](docs/twitch-setup.md)) and `tools/Publish-Release.ps1` publishes a version
+to GitHub. `tools/Run-ModsSelfTest.ps1` runs an unattended,
 silent in-game test of the mods.
 
 ```
