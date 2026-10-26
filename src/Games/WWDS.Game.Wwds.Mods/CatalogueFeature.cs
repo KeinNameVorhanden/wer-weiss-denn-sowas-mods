@@ -86,16 +86,7 @@ public sealed class CatalogueFeature : FeatureBase
         {
             Prefix = AccessTools.Method(typeof(CatalogueFeature), nameof(VideoPrefix)),
         });
-        _ui.Patch(new PatchSpec("mods.catalogue.save", "Progress of shows 31-60 goes to its own file.",
-            () => AccessTools.Method(typeof(SDataAccess), "SaveSessionHistory"), none)
-        {
-            Prefix = AccessTools.Method(typeof(CatalogueFeature), nameof(SaveSessionHistoryPrefix)),
-        });
-        _ui.Patch(new PatchSpec("mods.catalogue.load", "Merge the progress of shows 31-60 when loading.",
-            () => AccessTools.Method(typeof(SDataAccess), "LoadSessionHistory"), none)
-        {
-            Postfix = AccessTools.Method(typeof(CatalogueFeature), nameof(LoadSessionHistoryPostfix)),
-        });
+        SessionFiles.Register(_ui, HostShows + 1, 2 * HostShows, () => SessionsFile, () => Other != null);
     }
 
     protected override void OnStop() => _current = null;
@@ -263,7 +254,7 @@ public sealed class CatalogueFeature : FeatureBase
         var self = _current;
         if (self == null || variants == null || variants.Length == 0) return;
         if (!int.TryParse(variants[0], out var show)) return;
-        self._foreignShow = self.Active && show > HostShows;
+        self._foreignShow = self.Active && show > HostShows && show <= 2 * HostShows;
         if (!self._foreignShow) return;
         variants = new[] { (show - HostShows).ToString() }.Concat(variants.Skip(1)).ToArray();
         self.Log.Info("Show " + show + " = " + self.Other!.Name + " show " + variants[0]);
@@ -317,60 +308,5 @@ public sealed class CatalogueFeature : FeatureBase
         public void Reset()
         {
         }
-    }
-
-    // ---- separate progress for shows 31-60 ----------------------------------------------------------
-
-    /// <summary>Writes shows 1-30 to the game's file and 31-60 to the catalogue file (the game's file stays loadable without the mod).</summary>
-    private static bool SaveSessionHistoryPrefix()
-    {
-        var self = _current;
-        if (self == null || self.Other == null) return true;
-        try
-        {
-            var last = SDataAccess.LastSession;
-            var lastId = last != null && !last.IsFinished ? last.ShowID : 0;
-            var all = SDataAccess.SessionHistory != null ? SDataAccess.SessionHistory.Values.ToArray() : new DataSession[0];
-            SSaveData.Instance.Save(Split(all, lastId, own: true), "Sessions");
-            SSaveData.Instance.Save(Split(all, lastId, own: false), self.SessionsFile);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            self.Log.Warn("Catalogue save split failed, saving normally: " + ex.Message);
-            return true;
-        }
-    }
-
-    internal static DataSessionHistory Split(DataSession[] all, int lastId, bool own)
-    {
-        var part = all.Where(s => own ? s.ShowID <= HostShows : s.ShowID > HostShows).ToArray();
-        var lastHere = own ? lastId <= HostShows : lastId > HostShows;
-        return new DataSessionHistory { LastSessionID = lastHere ? lastId : 0, SessionHisory = part.Length > 0 ? part : null };
-    }
-
-    private static void LoadSessionHistoryPostfix(ref IEnumerator __result)
-    {
-        var self = _current;
-        if (self == null || !self._enabled.Value) return;
-        __result = self.LoadWithCatalogue(__result);
-    }
-
-    private IEnumerator LoadWithCatalogue(IEnumerator original)
-    {
-        while (original.MoveNext()) yield return original.Current;
-        if (Other == null) yield break;
-        var data = new DataSessionHistory();
-        yield return SSaveData.Instance.Load(SessionsFile);
-        SSaveData.Instance.GetSaveData(ref data);
-        if (data.SessionHisory == null) yield break;
-        foreach (var session in data.SessionHisory)
-        {
-            if (session.ShowID <= HostShows) continue;
-            if (session.ShowID == data.LastSessionID) SDataAccess.LastSession = session;
-            SDataAccess.SessionHistory[session.ShowID] = session;
-        }
-
-        Log.Info("Loaded " + data.SessionHisory.Length + " sessions of shows 31-60");
     }
 }

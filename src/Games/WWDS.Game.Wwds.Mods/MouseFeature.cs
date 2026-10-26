@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -62,6 +63,8 @@ public sealed class MouseFeature : FeatureBase
     private float _lastMove;
     private UnityEngine.Object? _hover;
     private ViewBonusQuestionUI? _bonusView;
+    private ViewSelectCharacter? _characterPick;
+    private ViewAudienceJoker? _jokerPick;
     private Team? _bonusTeam;
 
     public override string Id => FeatureId;
@@ -107,6 +110,16 @@ public sealed class MouseFeature : FeatureBase
             () => AccessTools.Method(typeof(ViewBonusQuestionUI), "OnWaitForAnswerUpdated", new[] { typeof(Team) }), none)
         {
             Prefix = AccessTools.Method(typeof(MouseFeature), nameof(BonusTurnPrefix)),
+        });
+        _ui.Patch(new PatchSpec("mods.mouse.character-pick", "Know when the make-up room's character picker reads input (wheel browses).",
+            () => AccessTools.Method(typeof(ViewSelectCharacter), nameof(ViewSelectCharacter.ProcessInput)), none)
+        {
+            Postfix = AccessTools.Method(typeof(MouseFeature), nameof(CharacterPickPostfix)),
+        });
+        _ui.Patch(new PatchSpec("mods.mouse.joker-pick", "Know when a player picks an audience member (wheel browses).",
+            () => AccessTools.Method(typeof(ViewAudienceJoker), "WaitForPlayerInput"), none)
+        {
+            Postfix = AccessTools.Method(typeof(MouseFeature), nameof(JokerPickPostfix)),
         });
         Track(_ui.OnState(state =>
         {
@@ -172,8 +185,11 @@ public sealed class MouseFeature : FeatureBase
         if (state == "StateScreenSelectPlayers" && Selection(left, right, wheel)) return;
         var hit = RaycastUi();
         if (Category(hit, moved, left)) return;
+        if (SelectionBox(hit, left, wheel)) return;
         if (Navigation(hit, moved, left)) return;
         if (Bonus(wheel)) return;
+        if (Browse(wheel)) return;
+        if (Scroll(hit, wheel)) return;
         if (left)
         {
             var face = hit == null ? null : GlyphFace(hit);
@@ -217,6 +233,8 @@ public sealed class MouseFeature : FeatureBase
             }
 
             if (faces.Count == 1) return faces.First();
+            // The audience joker prompt shows both shoulders; either one calls it.
+            if (faces.Count == 2 && faces.Contains(InputControlType.LeftBumper) && faces.Contains(InputControlType.RightBumper)) return InputControlType.LeftBumper;
             if (faces.Count > 1) return null;
         }
 
@@ -359,6 +377,77 @@ public sealed class MouseFeature : FeatureBase
         if (inner != null) NavigationElement.DynamicRemoveHighlight(inner);
         highlighted.SetValue(group, element);
         NavigationElement.DynamicHighlight(element);
+    }
+
+    // ---- left/right pickers and lists ---------------------------------------------------------------
+
+    /// <summary>Resolution box: click its left or right half, or turn the wheel over it.</summary>
+    private bool SelectionBox(GameObject? hit, bool left, float wheel)
+    {
+        var box = hit == null ? null : hit.GetComponentInParent<NavigationHorizontalSelectionBox>();
+        if (box == null || (!left && Math.Abs(wheel) < 0.01f)) return false;
+        var rect = (RectTransform)box.transform;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, Input.mousePosition, null, out var local);
+        var forward = left ? local.x > rect.rect.center.x : wheel < 0;
+        box.SelectNextElement(forward ? InputDirection.Right : InputDirection.Left);
+        return true;
+    }
+
+    /// <summary>The wheel browses characters in the make-up room and the audience members for the joker.</summary>
+    private bool Browse(float wheel)
+    {
+        if (Math.Abs(wheel) < 0.01f) return false;
+        var character = _characterPick;
+        if (character != null && character.isActiveAndEnabled && MainMenuController.Instance != null && !MainMenuController.Instance.IsInputLocked()
+            && !(bool)AccessTools.Field(typeof(ViewSelectCharacter), "charRemovalPending").GetValue(character))
+        {
+            if (wheel > 0) character.PressLeft();
+            else character.PressRight();
+            return true;
+        }
+
+        var joker = _jokerPick;
+        if (joker == null || !joker.isActiveAndEnabled || UIManager.Instance.gamePaused) return false;
+        var player = AccessTools.Field(typeof(ViewAudienceJoker), "activePlayer").GetValue(joker) as APlayerAgent;
+        if ((player?.Input as InputPlayer)?.Device is not { } device || device != Owner()) return false;
+        AccessTools.Method(typeof(ViewAudienceJoker), wheel > 0 ? "SelectPreviousAudienceMember" : "SelectNextAudienceMember").Invoke(joker, null);
+        return true;
+    }
+
+    /// <summary>Lists (archive, statistics, credits) scroll with the wheel; the game's pointer input is off.</summary>
+    private static bool Scroll(GameObject? hit, float wheel)
+    {
+        var rect = hit == null || Math.Abs(wheel) < 0.01f ? null : hit.GetComponentInParent<UnityEngine.UI.ScrollRect>();
+        if (rect == null || !rect.vertical || rect.content == null || rect.viewport == null) return false;
+        var overflow = rect.content.rect.height - rect.viewport.rect.height;
+        if (overflow <= 1f) return false;
+        rect.verticalNormalizedPosition = Mathf.Clamp01(rect.verticalNormalizedPosition + (wheel * 120f / overflow));
+        return true;
+    }
+
+    private static void CharacterPickPostfix(ViewSelectCharacter __instance, ref IEnumerator __result)
+    {
+        if (_current is { } self) __result = self.WhileRunning(__result, __instance, v => self._characterPick = v);
+    }
+
+    private static void JokerPickPostfix(ViewAudienceJoker __instance, ref IEnumerator __result)
+    {
+        if (_current is { } self) __result = self.WhileRunning(__result, __instance, v => self._jokerPick = v);
+    }
+
+    /// <summary>Remembers a view while one of its input loops runs.</summary>
+    private IEnumerator WhileRunning<T>(IEnumerator original, T view, Action<T?> set)
+        where T : class
+    {
+        set(view);
+        try
+        {
+            while (original.MoveNext()) yield return original.Current;
+        }
+        finally
+        {
+            set(null);
+        }
     }
 
     // ---- bonus estimate -----------------------------------------------------------------------------

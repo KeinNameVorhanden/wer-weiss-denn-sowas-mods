@@ -13,6 +13,9 @@
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GameRefDir)\UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(GameRefDir)\UnityEngine.ScreenCaptureModule.dll" Private="false" />
     <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GameRefDir)\UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UnityWebRequestModule" HintPath="$(GameRefDir)\UnityEngine.UnityWebRequestModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule" HintPath="$(GameRefDir)\UnityEngine.UnityWebRequestAudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.VideoModule" HintPath="$(GameRefDir)\UnityEngine.VideoModule.dll" Private="false" />
   </ItemGroup>
   <ItemGroup Condition="'$(WwdsNeedsGame)' == 'true'">
     <Reference Include="Assembly-CSharp" HintPath="$(GameRefDir)\Assembly-CSharp.dll" Private="false" />

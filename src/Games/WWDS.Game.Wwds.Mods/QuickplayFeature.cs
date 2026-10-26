@@ -81,7 +81,7 @@ public sealed class QuickplayFeature : FeatureBase
         _enabled = c.Bind(s, "Enabled", true, "Fill the player selection from the line-up below (the Main door starts the show directly).");
         _resume = c.Bind(s, "QuickResume", true, "When resuming a saved show, reconnect its players to the line-up devices automatically.");
         _countdown = c.Bind(s, "CountdownSeconds", 1, "Start countdown on the selection screen (game default 3).");
-        _showId = c.Bind(s, "ShowId", -1, "Show to play (1..30), -1 = the game's next unplayed show.");
+        _showId = c.Bind(s, "ShowId", -1, "Show to play (1..30, 31..60 other game, 101+ own question packs), -1 = the game's next unplayed show.");
         var defaults = new[] { Seat.Keyboard, Seat.Empty, Seat.Bot, Seat.Empty };
         for (var i = 0; i < 4; i++)
         {
@@ -209,7 +209,7 @@ public sealed class QuickplayFeature : FeatureBase
         AccessTools.Field(t, "isTutorial").SetValue(view, false);
         AccessTools.Field(t, "startUpTime").SetValue(view, Math.Max(1, _countdown.Value));
         var maxShow = Context.Get<CatalogueFeature>()?.Active == true ? 2 * CatalogueFeature.HostShows : CatalogueFeature.HostShows;
-        if (_showId.Value >= 1 && _showId.Value <= maxShow) AccessTools.Field(t, "selectedShowID").SetValue(view, _showId.Value);
+        if ((_showId.Value >= 1 && _showId.Value <= maxShow) || Context.Get<CustomQuestionsFeature>()?.HasShow(_showId.Value) == true) AccessTools.Field(t, "selectedShowID").SetValue(view, _showId.Value);
         var store = SDataStore.Instance;
         if (!store.SettingsData.PlayedTutorial1P)
         {

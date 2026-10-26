@@ -166,7 +166,7 @@ public sealed class EscMenuFeature : FeatureBase
 
     internal void EndShow()
     {
-        _window!.Close();
+        _window?.Close();
         var pause = PauseMenu();
         if (pause != null) pause.EndGame();
         else SGameFSM.Instance.SetInputAndContinue(2);

@@ -44,6 +44,11 @@ public sealed class GameSettingsFeature : FeatureBase
     private IConfigValue<bool> _muteVoice = null!;
     private IConfigValue<float> _master = null!;
     private IConfigValue<bool> _muteInBackground = null!;
+    private IConfigValue<float> _audience = null!;
+    private IConfigValue<float> _video = null!;
+    private float _applauseBase = 1f;
+    private float _duck = 1f;
+    private AudioSource? _videoSource;
     private GameObject? _focus;
     private bool _focused = true;
     private bool _volumesApplied;
@@ -75,6 +80,8 @@ public sealed class GameSettingsFeature : FeatureBase
         _muteVoice = c.Bind(s, "MuteVoice", false, "Silence voices completely.");
         _master = c.Bind(s, "MasterVolume", 1f, "Overall volume (0 to 1) on top of the music, effects and voice settings.");
         _muteInBackground = c.Bind(s, "MuteInBackground", false, "Silence the game while its window is not in front (with RunInBackground it keeps running quietly).");
+        _audience = c.Bind(s, "AudienceVolume", 1f, "Studio audience (applause, aah/ooh) relative to the other effects, 0 to 1.");
+        _video = c.Bind(s, "VideoVolume", 1f, "Answer videos relative to the game's level, 0 to 2.5 (the game plays them at a fixed 40 %, outside its volume settings).");
         _focus = new GameObject("WWDS_Focus");
         UnityEngine.Object.DontDestroyOnLoad(_focus);
         _focus.AddComponent<FocusWatcher>().Changed += _ => ApplyMaster();
@@ -97,6 +104,7 @@ public sealed class GameSettingsFeature : FeatureBase
             });
         }
 
+        PatchAudience();
         SceneManager.sceneLoaded += OnSceneLoaded;
         if (_manageDisplay.Value) ApplyDisplay();
     }
@@ -158,11 +166,14 @@ public sealed class GameSettingsFeature : FeatureBase
     /// <summary>Silence regardless of settings (unattended self-test runs); not saved.</summary>
     public static bool ForceMute { get; set; }
 
+    /// <summary>Exact listener volume for the self-test's audio probe (the mixer is silent then); null = normal.</summary>
+    public static float? ListenerOverride { get; set; }
+
     /// <summary>Master volume, or silence while unfocused when MuteInBackground is on.</summary>
     private void ApplyMaster()
     {
         if (_focus != null) _focused = _focus.GetComponent<FocusWatcher>().Focused;
-        var target = TargetVolume(_master.Value, _muteInBackground.Value, _focused, ForceMute);
+        var target = ListenerOverride ?? TargetVolume(_master.Value, _muteInBackground.Value, _focused, ForceMute);
         if (!Mathf.Approximately(AudioListener.volume, target)) AudioListener.volume = target;
     }
 
@@ -275,6 +286,102 @@ public sealed class GameSettingsFeature : FeatureBase
             _ => new[] { "volVoice" },
         };
         foreach (var n in names) group.audioMixer.SetFloat(n, -80f);
+    }
+
+    // ---- audience and answer videos ------------------------------------------------------------------
+
+    /// <summary>Studio audience sounds (applause loop, aah/ooh/uuh), 0..1 of their normal level.</summary>
+    public float AudienceVolume
+    {
+        get => Mathf.Clamp01(_audience.Value);
+        set
+        {
+            _audience.Value = Mathf.Clamp01(value);
+            UpdateApplause();
+        }
+    }
+
+    /// <summary>Audience factor while someone speaks (1 = none), set by the voice feature.</summary>
+    public void SetAudienceDuck(float level)
+    {
+        _duck = Mathf.Clamp01(level);
+        UpdateApplause();
+    }
+
+    private float AudienceLevel => AudienceVolume * _duck;
+
+    private void UpdateApplause()
+    {
+        var source = Field<AudioSource>("SFXApplauseAudioSource");
+        if (source != null && source.isPlaying) source.volume = _applauseBase * AudienceLevel;
+    }
+
+    /// <summary>Answer videos, 0..2.5 of the game's fixed 40 % (so at most full volume).</summary>
+    public float VideoVolume
+    {
+        get => Mathf.Clamp(_video.Value, 0f, 2.5f);
+        set
+        {
+            _video.Value = Mathf.Clamp(value, 0f, 2.5f);
+            if (_videoSource != null) _videoSource.volume = VideoSourceVolume;
+        }
+    }
+
+    private float VideoSourceVolume => Mathf.Clamp01(0.4f * VideoVolume);
+
+    private static T? Field<T>(string name)
+        where T : class =>
+        ExistingSound is { } sound ? AccessTools.Field(typeof(SSoundManager), name).GetValue(sound) as T : null;
+
+    /// <summary>The game's sound manager if it exists (its Instance getter creates a broken one while the game quits).</summary>
+    internal static SSoundManager? ExistingSound => AccessTools.Field(typeof(SSoundManager), "instance").GetValue(null) as SSoundManager;
+
+    private void PatchAudience()
+    {
+        var none = ModCore.Capabilities.GameCapability.None;
+        _ui.Patch(new PatchSpec("mods.audience.applause", "Scale the studio applause by the audience volume.",
+            () => AccessTools.Method(typeof(SSoundManager), "PlayApplauseAndWait", new[] { typeof(AudioClip), typeof(bool), typeof(float) }), none)
+        {
+            Prefix = AccessTools.Method(typeof(GameSettingsFeature), nameof(ApplausePrefix)),
+        });
+        _ui.Patch(new PatchSpec("mods.audience.sfx", "Scale audience reactions (aah/ooh/uuh) by the audience volume.",
+            () => AccessTools.Method(typeof(SSoundManager), "PlaySFX", new[] { typeof(AudioClip), typeof(float) }), none)
+        {
+            Prefix = AccessTools.Method(typeof(GameSettingsFeature), nameof(AudienceSfxPrefix)),
+        });
+        _ui.Patch(new PatchSpec("mods.audience.sfx-wait", "Scale audience reactions (aah/ooh/uuh) by the audience volume.",
+            () => AccessTools.Method(typeof(SSoundManager), "PlaySFXAndWait", new[] { typeof(AudioClip), typeof(bool), typeof(float) }), none)
+        {
+            Prefix = AccessTools.Method(typeof(GameSettingsFeature), nameof(AudienceSfxPrefix)),
+        });
+        _ui.Patch(new PatchSpec("mods.video-volume", "Answer video volume (the game fixes it at 40 %).",
+            () => AccessTools.Method(typeof(VideoPlayerPC), nameof(VideoPlayerPC.Init)), none)
+        {
+            Postfix = AccessTools.Method(typeof(GameSettingsFeature), nameof(VideoInitPostfix)),
+        });
+    }
+
+    internal static bool IsAudienceClip(AudioClip? clip) => clip != null && clip.name.StartsWith("sfx_audience_", StringComparison.Ordinal);
+
+    private static void ApplausePrefix(ref float volume)
+    {
+        var f = _current;
+        if (f == null) return;
+        f._applauseBase = volume;
+        volume *= f.AudienceLevel;
+    }
+
+    private static void AudienceSfxPrefix(AudioClip sound, ref float volume)
+    {
+        if (_current != null && IsAudienceClip(sound)) volume *= _current.AudienceLevel;
+    }
+
+    private static void VideoInitPostfix(AudioSource ___audioSource)
+    {
+        var f = _current;
+        if (f == null || ___audioSource == null) return;
+        f._videoSource = ___audioSource;
+        ___audioSource.volume = f.VideoSourceVolume;
     }
 
     // ---- display ------------------------------------------------------------------------------------

@@ -124,9 +124,15 @@ public sealed class HarnessPlugin : BaseUnityPlugin, IHostControl
         _ctx.Features.Register(new OverlayFeature());
         _ctx.Features.Register(new DebugToolsFeature());
         _ctx.Features.Register(new GameSettingsFeature());
+        _ctx.Features.Register(new VoiceFeature());
+        _ctx.Features.Register(new VoiceLevelFeature());
+        _ctx.Features.Register(new CustomVoiceFeature());
         _ctx.Features.Register(new CatalogueFeature());
+        _ctx.Features.Register(new CustomQuestionsFeature());
+        _ctx.Features.Register(new LongGameFeature());
         _ctx.Features.Register(new SkipIntroFeature());
         _ctx.Features.Register(new QuickplayFeature());
+        _ctx.Features.Register(new InputDevicesFeature());
         _ctx.Features.Register(new MouseFeature());
         _ctx.Features.Register(new KeyboardFeature());
         _ctx.Features.Register(new VoteHudFeature());

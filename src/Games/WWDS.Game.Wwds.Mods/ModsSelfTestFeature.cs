@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using InControl;
 using UnityEngine;
+using UnityEngine.Audio;
 using WWDS.ModCore.Events;
 using WWDS.ModCore.Features;
+using WWDS.ModCore.Input;
 using WWDS.ModCore.Model;
 
 namespace WWDS.Game.Wwds.Mods;
@@ -102,6 +104,18 @@ public sealed class ModsSelfTestFeature : FeatureBase
             return;
         }
 
+        if (_mode.Value == "Custom")
+        {
+            BuildCustom();
+            return;
+        }
+
+        if (_mode.Value == "Long")
+        {
+            BuildLong();
+            return;
+        }
+
         Do("mod menu pages build", () =>
         {
             var menu = Context.Get<ModMenuFeature>() ?? throw new InvalidOperationException("ModMenu feature not running");
@@ -145,6 +159,53 @@ public sealed class ModsSelfTestFeature : FeatureBase
             return "ok";
         });
         Wait(1);
+        // Does Unity scale a source by the listener volume before its filters (the voice leveler must know)?
+        // A tone on the muted Voice group is measured with the listener at 1 and at 0.5 (mixer silent).
+        AudioProbe? probe = null;
+        var full = 0f;
+        Do("audio probe: tone on the muted mixer", () =>
+        {
+            probe = AudioProbe.Start();
+            GameSettingsFeature.ListenerOverride = 1f;
+            return "ok";
+        });
+        Wait(0.8);
+        Do("audio probe: settle", () => probe!.TakeRms().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Wait(1.5);
+        Do("audio probe: level at listener 1", () =>
+        {
+            full = probe!.TakeRms();
+            if (full <= 0f) throw new InvalidOperationException("the probe filter got no audio");
+            GameSettingsFeature.ListenerOverride = 0.5f;
+            return "rms " + full.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        });
+        Wait(0.8);
+        Do("audio probe: settle again", () => probe!.TakeRms().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Wait(1.5);
+        Do("audio probe: listener volume before source filters", () =>
+        {
+            var half = probe!.TakeRms();
+            GameSettingsFeature.ListenerOverride = 1f;
+            var ratio = half / full;
+            Log.Info("[SelfTest] listener 0.5 gives the source filter " + ratio.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + " of the level at 1");
+            if (Math.Abs(ratio - 0.5f) > 0.08f) throw new InvalidOperationException("ratio " + ratio + ": the listener volume is not applied before the filters, the leveler compensates wrongly");
+            return "yes (ratio " + ratio.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + ")";
+        });
+        var known = 0;
+        Do("voice leveler: play a director line (mixer still silent)", () =>
+        {
+            known = Context.Get<VoiceLevelFeature>()?.Known ?? throw new InvalidOperationException("VoiceLevel feature not running");
+            SSoundManager.Instance.PlayVoiceFile(EVoiceType.Director, string.Empty, "mainmenu_welcome", "intro");
+            return known + " lines known before";
+        });
+        Add("voice leveler learns the line", 30, () => Context.Get<VoiceLevelFeature>()!.Known > known);
+        Do("audio probe: end, silent again", () =>
+        {
+            GameSettingsFeature.ListenerOverride = null;
+            AudioListener.volume = 0f;
+            probe!.Stop();
+            return Context.Get<VoiceLevelFeature>()!.Known + " lines known";
+        });
         Do("menu settings are written to the config file", () =>
         {
             var gs = Context.Get<GameSettingsFeature>()!;
@@ -265,6 +326,106 @@ public sealed class ModsSelfTestFeature : FeatureBase
         Add("main menu", 60, () => _ui.State == "StateScreenMainMenu");
     }
 
+    /// <summary>A temporary own question pack (written by the runner): its questions, no video hang, own save file.</summary>
+    private void BuildCustom()
+    {
+        var cq = Context.Get<CustomQuestionsFeature>() ?? throw new InvalidOperationException("CustomQuestions feature not running");
+        var id = 0;
+        Add("self-test pack loaded", 20, () =>
+        {
+            id = cq.Packs.FirstOrDefault(p => p.Pack.Id == "zz-selftest")?.ShowIds.FirstOrDefault() ?? 0;
+            return id > 0;
+        });
+        Add("own voice line (wav) loaded", 20, () =>
+        {
+            var voices = Context.Get<CustomVoiceFeature>();
+            return voices != null && !voices.Loading && voices.HasLine("wwds_selftest_line");
+        });
+        Do("quickplay the pack show", () =>
+        {
+            var quick = Context.Get<QuickplayFeature>()!;
+            quick.ShowId.Value = id;
+            return "show " + id + ": " + quick.StartFromMainMenu();
+        });
+        ReachSelection();
+        Add("show loop", 90, () => _ui.State == "StateShowLoop");
+        Add("pack show active", 5, () => cq.Active && SDataAccess.ActiveSession != null && SDataAccess.ActiveSession.ActiveShowIndex == id);
+        PressUntil("first question starts", 180, () => _questionStarted);
+        Do("question comes from the pack", () =>
+        {
+            var q = SDataAccess.ActiveSession!.GetActiveQuestionData();
+            if (!q.Frage.StartsWith("Selbsttest Frage", StringComparison.Ordinal)) throw new InvalidOperationException("question: " + q.Frage);
+            return q.Frage + " / " + q.A + ", " + q.B + ", " + q.C;
+        });
+        Do("capture question", () => Capture("custom_question.png"));
+        var saves = Application.persistentDataPath;
+        PressUntil("round completes without videos hanging (bot plays, human answers C)", 300, () => System.IO.File.Exists(System.IO.Path.Combine(saves, "Sessions_Custom.bin")));
+        Do("pack show progress only in Sessions_Custom", () =>
+        {
+            var own = System.Text.Encoding.UTF8.GetString(System.IO.File.ReadAllBytes(System.IO.Path.Combine(saves, "Sessions.bin")));
+            if (own.Contains("\"ShowID\":" + id)) throw new InvalidOperationException("show " + id + " found in Sessions.bin");
+            var custom = System.Text.Encoding.UTF8.GetString(System.IO.File.ReadAllBytes(System.IO.Path.Combine(saves, "Sessions_Custom.bin")));
+            if (!custom.Contains("\"ShowID\":" + id)) throw new InvalidOperationException("show " + id + " missing in Sessions_Custom.bin");
+            return "Sessions_Custom.bin has show " + id;
+        });
+        Do("back to the main menu", () =>
+        {
+            Context.Get<EscMenuFeature>()!.EndShow();
+            return "ok";
+        });
+        Add("main menu", 60, () => _ui.State == "StateScreenMainMenu");
+    }
+
+    /// <summary>A long show with 2 boards (shortened to 2 questions each): board change, final, resume on board 2.</summary>
+    private void BuildLong()
+    {
+        var lg = Context.Get<LongGameFeature>() ?? throw new InvalidOperationException("LongGame feature not running");
+        var start = 0;
+        Do("quickplay a long show", () => Context.Get<QuickplayFeature>()!.StartFromMainMenu());
+        ReachSelection();
+        Add("show loop", 90, () => _ui.State == "StateShowLoop");
+        Do("boards of 2 questions", () =>
+        {
+            SDataStore.Instance.normalShowQuestions = 2;
+            start = SDataAccess.ActiveSession!.ActiveShowIndex;
+            return "show " + start + ", " + lg.Status;
+        });
+        Add("long show has 2 boards", 5, () => lg.Status == "Brett 1 von 2");
+        var firstBoard = string.Empty;
+        Do("board 1 categories", () => firstBoard = SDataAccess.ActiveSession!.CurrentShow.dataArray[0].Kategoriename);
+        PressUntil("board 2 starts after 2 questions", 600, () => lg.Status == "Brett 2 von 2");
+        Add("board 2 has new categories", 120, () => SDataAccess.ActiveSession!.CurrentShow.dataArray[0].Kategoriename != firstBoard);
+        Add("progress cleared for board 2", 5, () => SDataAccess.ActiveSession!.GetQuestionCount() == 0);
+        PressUntil("a board 2 question is answered (saved)", 400, () => SDataAccess.ActiveSession!.GetQuestionCount() >= 1);
+        Do("capture board 2", () => Capture("long_board2.png"));
+        Do("leave the show", () =>
+        {
+            Context.Get<EscMenuFeature>()!.EndShow();
+            return "ok";
+        });
+        Add("main menu", 60, () => _ui.State == "StateScreenMainMenu");
+        Wait(2);
+        Do("resume the long show", () =>
+        {
+            MainMenuController.Instance.StartShow(true, start);
+            return "show " + start;
+        });
+        Add("resumed show loop", 120, () => _ui.State == "StateShowLoop");
+        Add("resumed on board 2", 5, () => lg.ResumedOn == 2 && lg.Status == "Brett 2 von 2" && SDataAccess.ActiveSession!.CurrentShow.dataArray[0].Kategoriename != firstBoard);
+        Do("boards of 2 questions again", () =>
+        {
+            SDataStore.Instance.normalShowQuestions = 2;
+            return "ok";
+        });
+        PressUntil("final question after the last board", 600, () => SDataAccess.ActiveSession!.GetActiveQuestionData().EQUESTIONTYPE != EQuestionType.Question);
+        Do("back to the main menu", () =>
+        {
+            Context.Get<EscMenuFeature>()!.EndShow();
+            return "ok";
+        });
+        Add("main menu at the end", 60, () => _ui.State == "StateScreenMainMenu");
+    }
+
     private void BuildScreens()
     {
         Add("welcome window opens by itself", 15, () => Context.Get<FirstRunFeature>()?.Window?.IsOpen == true);
@@ -345,10 +506,11 @@ public sealed class ModsSelfTestFeature : FeatureBase
     private string Shortcut(int digit)
     {
         var phase = Context.Adapter?.GetSnapshot().Phase ?? GamePhase.Unknown;
-        var controls = KeyboardFeature.Controls(phase, digit, false).ToList();
-        if (controls.Count != 1) throw new InvalidOperationException("phase " + phase + " gives " + controls.Count + " controls");
-        _ui.Pad.Press(VirtualPad.Keyboard!, controls[0]);
-        return phase + " -> " + controls[0];
+        var presses = KeyboardLayout.Map(phase, false, new[] { "Alpha" + digit });
+        if (presses.Count != 1) throw new InvalidOperationException("phase " + phase + " gives " + presses.Count + " presses");
+        var control = KeyboardFeature.ToControl(presses[0].Button);
+        _ui.Pad.Press(VirtualPad.Keyboard!, control);
+        return phase + " -> " + control;
     }
 
     private string Press(InputControlType control)
@@ -358,12 +520,16 @@ public sealed class ModsSelfTestFeature : FeatureBase
         return control.ToString();
     }
 
-    protected override void OnStop() => GameSettingsFeature.ForceMute = false;
+    protected override void OnStop()
+    {
+        GameSettingsFeature.ForceMute = false;
+        GameSettingsFeature.ListenerOverride = null;
+    }
 
     public override void Tick()
     {
         if (_index >= _steps.Count) return;
-        if (GameSettingsFeature.ForceMute && AudioListener.volume > 0f) AudioListener.volume = 0f;
+        if (GameSettingsFeature.ForceMute && GameSettingsFeature.ListenerOverride == null && AudioListener.volume > 0f) AudioListener.volume = 0f;
         var now = Context.Clock.Now;
         if (UserTookOver())
         {
@@ -501,5 +667,77 @@ public sealed class ModsSelfTestFeature : FeatureBase
         public Func<string?> Run { get; }
 
         public double After { get; set; }
+    }
+
+    /// <summary>A quiet test tone on the Voice group with the mixer fully muted, and a filter that measures it.</summary>
+    private sealed class AudioProbe
+    {
+        private readonly GameObject _go;
+        private readonly Dictionary<string, float> _saved = new();
+        private readonly AudioMixer? _mixer;
+        private readonly ProbeFilter _filter;
+
+        private AudioProbe()
+        {
+            var group = HarmonyLib.AccessTools.Field(typeof(SSoundManager), "VoiceAudioMixer").GetValue(SSoundManager.Instance) as AudioMixerGroup;
+            _mixer = group?.audioMixer;
+            foreach (var name in new[] { "volMusic", "volSFX", "volUI", "volAmbient", "volVoice" })
+            {
+                if (_mixer != null && _mixer.GetFloat(name, out var value))
+                {
+                    _saved[name] = value;
+                    _mixer.SetFloat(name, -80f);
+                }
+            }
+
+            var samples = new float[48000];
+            for (var i = 0; i < samples.Length; i++) samples[i] = 0.1f * Mathf.Sin(2f * Mathf.PI * 440f * i / 48000f);
+            var clip = AudioClip.Create("wwds_probe", samples.Length, 1, 48000, false);
+            clip.SetData(samples, 0);
+            _go = new GameObject("WWDS_AudioProbe");
+            var source = _go.AddComponent<AudioSource>();
+            source.outputAudioMixerGroup = group;
+            source.clip = clip;
+            source.loop = true;
+            _filter = _go.AddComponent<ProbeFilter>();
+            source.Play();
+        }
+
+        public static AudioProbe Start() => new();
+
+        public float TakeRms() => _filter.Take();
+
+        public void Stop()
+        {
+            UnityEngine.Object.Destroy(_go);
+            foreach (var p in _saved) _mixer?.SetFloat(p.Key, p.Value);
+        }
+    }
+
+    private sealed class ProbeFilter : MonoBehaviour
+    {
+        private readonly object _lock = new();
+        private double _sum;
+        private long _count;
+
+        public float Take()
+        {
+            lock (_lock)
+            {
+                var rms = _count == 0 ? 0f : (float)Math.Sqrt(_sum / _count);
+                _sum = 0;
+                _count = 0;
+                return rms;
+            }
+        }
+
+        private void OnAudioFilterRead(float[] data, int channels)
+        {
+            lock (_lock)
+            {
+                for (var i = 0; i < data.Length; i++) _sum += data[i] * data[i];
+                _count += data.Length;
+            }
+        }
     }
 }

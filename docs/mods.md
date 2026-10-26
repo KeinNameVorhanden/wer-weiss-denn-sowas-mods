@@ -33,6 +33,7 @@ Pages:
 
 - **Spiel**: overall volume (on top of the game's settings) and "Stumm im Hintergrund" (silence while the
   game window is not in front); music, effects and voice volume in the game's own 10 steps plus a real mute for each;
+  audience and answer video volume (see Sound);
   resolution, window mode (fullscreen, borderless, windowed), frame rate limit (the game caps at 60),
   VSync, quality level; keep running in the background. Display settings are only managed by the mod
   after you change one of them here; then they are restored at every start and the Tech room no longer
@@ -44,6 +45,7 @@ Pages:
   rules), answer votes and polls, how `!vote 1500` numbers are combined, who-wins bets.
 - **Schnellstart**: the quickplay line-up (below).
 - **Komfort**: skip intro, mouse, ESC menu and hotkeys.
+- **Inhalte**: long show, own question packs, own voice lines.
 - **Features**: every module on or off.
 - **Alle Einstellungen**: every harness setting, grouped by section, edited in place; each section can be
   reset to its defaults.
@@ -136,15 +138,47 @@ seats replaces its celebrity captain, like in the game.
 
 - Every team needs at least one seat; a device can only sit once; only one seat can be Twitch.
 - If a configured gamepad is missing, the normal selection screen stays usable and the mod menu shows why.
-- `ShowId` plays a specific show (1 to 30), -1 the game's next unplayed one.
+- `ShowId` plays a specific show (1 to 30, 31 to 60 from the other game, 101 and up from own packs), -1
+  the game's next unplayed one.
 - Resuming a saved show: `QuickResume` reconnects the saved players to the line-up's devices.
 - The tutorial from the archive always uses the normal selection.
 
 ## Keyboard shortcuts
 
-During a show (`[Keyboard] ShowShortcuts`): **Enter** or **Space** confirms (like A / J), **1 2 3** answer
-A B C (press twice like the game's buttons: select, then log in), **1 to 5** pick the master bet. The
-game's own keys (J K L, U O, arrows) keep working.
+The game has two keyboard layouts, so two people can share one keyboard: player 1 plays with the arrows,
+J K I L and U O, player 2 with W A S D, 1 2 3 4 and Q E (the on-screen button symbols show each
+player's keys). Join with U or O (player 1) and Q or E (player 2) on the selection screen. Both keyboard
+players can open the menu with Escape.
+
+Extra keys (`[Keyboard]`):
+
+| | One keyboard player | Two keyboard players (`TwoPlayerKeys`) |
+|---|---|---|
+| Confirm (A) | Enter, Space | Player 1: Enter, player 2: Space |
+| Answer A / B / C | 1 2 3 (top row or keypad) | Player 1: keypad 1 2 3, player 2: X C V |
+| Master bet 1 to 5 | 1 to 5 | Player 1: keypad 1 to 5, player 2: its own keys |
+| Audience joker | 0 | Player 1: keypad 0, player 2: Q or E |
+
+Answers keep the game's two-step confirm (press once to select, again to log in). The top-row digits
+are player 2's buttons, so in two-player games they never act for player 1.
+Outside a show, Enter confirms on the screens that only reacted to J (player slots, tutorial question,
+Tech room, archive; `EnterInMenus`). While a name is typed, both keyboards only react to Enter and
+Escape, so letters can no longer press buttons.
+
+## Gamepads
+
+The game recognizes pads by their name only and ignored many (for example a GuliKit in X mode, named
+"Controller (GuliKit X)", or any pad in Switch or DInput mode). With `[Input]`:
+
+- `AnyXInputName` (default on): every pad Windows names "Controller (...)" (XInput pads, GuliKit,
+  8BitDo in X mode, ...) plays as an Xbox controller.
+- `GenericControllers` (default on): any other pad gets a standard layout: bottom face button = A,
+  right = B, left = X, top = Y, shoulders, triggers, Select/Start, left stick and D-pad.
+  `GenericSwapAB` swaps A and B if your pad reports them the other way round (restart needed).
+- The log (`BepInEx/LogOutput.log`) lists every input device at start and each pad that connects.
+
+Without the mods, Steam Input (game properties > Controller > enable Steam Input) also helps: it
+presents the pad as an Xbox 360 controller, which the game knows (that is why Remote Play worked).
 
 ## Mouse
 
@@ -162,6 +196,45 @@ Clicks become controller presses of the player the mouse belongs to (`Owner`: th
 - Menus (Tech room, archive, make-up): hover moves the focus, click selects, right click goes back.
 - Bonus estimate: wheel changes the value (about a tenth of its size per notch, Shift for steps of 1),
   digit keys type it, Backspace deletes a digit; click the confirm prompt to log in.
+- Make-up room: the wheel browses the characters. Resolution (Tech room): click the left or right half
+  of the box, or turn the wheel over it. Audience joker: the wheel picks the audience member.
+- Archive and other lists scroll with the wheel.
 - Show intro and end screen: click to continue.
 - The game's own pointer handling of buttons is switched off while mouse support is on: it ignored turn
   and category rules.
+
+## Sound
+
+Page **Spiel** of the mod menu, `[Game]` and `[Voice]`:
+
+- **Publikum** (`AudienceVolume`): applause and the audience's aah/ooh, relative to the other effects.
+  While someone speaks, the audience is lowered further (`[Voice] AudienceDuck`, 0.5 = half).
+- **Antwortvideos** (`VideoVolume`): the explanation videos after each answer, which the game plays at a
+  fixed level outside its volume settings (100 % = as in the game, up to 250 %).
+- **Voice lines** (`[Voice]`): a new line of the same speaker waits until the running one is over
+  (`WaitForSameSpeaker`, at most `MaxWaitSeconds`) instead of cutting it off; where the game waits for a
+  line it now waits until it is really over (`WaitForRealEnd`, streamed lines start late); moving the
+  selection silences contestants and captains but lets the host finish (`KeepHostOnInput`).
+- **Normalization** (`[Voice] Normalize`): every voice line is brought to the same loudness
+  (`TargetLevelDb`, quiet lines raised by up to `MaxBoostDb`) and peaks are limited. The game streams its
+  voice files, so each line is measured the first time it plays and remembered in
+  `BepInEx/wwds/voice-levels.txt`; from then on it plays with a constant level.
+
+## Own questions and voice lines
+
+Own question packs (CSV from Excel or JSON, optional videos) become extra shows from number 101; own
+recordings replace any host, captain or contestant line. See [own-content.md](own-content.md).
+
+## Long show
+
+Page **Inhalte** of the mod menu, `[LongGame]`: `Boards` = 2 to 4 plays that many boards of 12
+categories before the final and the estimate. After each board Kai sums up the scores, the studio wall
+shows the 12 new categories and the game goes on.
+
+- `Source`: where the questions of the next boards come from: `NextUnplayed` (default: the next show you
+  have not played, also from the other game when imported), `Random`, `OwnPacks` (your question packs
+  first) or `OtherGame` (shows 31-60 first).
+- `JokerPerBoard` (default on): both teams get their audience joker back on every board.
+- Saving and resuming work as usual: a resumed long show continues on the board it was left on (the
+  boards of each show are kept in `BepInEx/wwds/long-games.txt`).
+- The money trophies are not unlocked in long shows (their amounts are meant for one board).

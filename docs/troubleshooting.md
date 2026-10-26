@@ -5,6 +5,9 @@
 | No `[WWDS Harness]` lines in `BepInEx/LogOutput.log` | Is BepInEx loading at all (`Chainloader startup complete`)? | Game 1 needs the x86 BepInEx, Game 2 x64. Reinstall with `tools/Install-ToGame.ps1`. |
 | "compatibility unknown" warning | The game was updated (Assembly-CSharp hash changed). | Check the capability list in the log/overlay; disabled features list the failing patch. Report the new hash to add it to `WwdsProfiles`. |
 | A feature shows `MissingCapabilities` | Overlay > Features, or the log line `Feature X: MissingCapabilities (game adapter lacks ...)` | A patch failed or a game member is missing; see Debug tab patch list. Individual patches can be switched off in `[Patches]`. |
+| A gamepad does nothing | `BepInEx/LogOutput.log`: `Input devices at start` and `Device attached` lines; `unknown profile` means the game has no layout for it | Keep `[Input] AnyXInputName` and `GenericControllers` on (default). If A and B are swapped: `GenericSwapAB = true`, restart. Alternative without mods: enable Steam Input for the game. |
+| An own question pack is missing | Mod menu > Inhalte lists every pack with its errors (file and line) | Fix the listed lines, then "Pakete neu laden". A show needs 12 questions, a final and an estimate. |
+| An own voice line is not used | Log: `Own voice line ... could not be loaded`; file name must equal the line name | `.ogg` or `.wav` only; show lines need a `showN` folder to apply to one show. "Satzliste exportieren" lists the names. |
 | Game stops when alt-tabbing | Unity pauses unfocused games. | `[General] RunInBackground = true`. |
 | Twitch: bridge says `rejected a connection: bad handshake` | Key mismatch | Start the bridge once so `%LOCALAPPDATA%\WWDS\bridge.key` exists, then restart the game. |
 | Twitch: `No bridge key` warning | Bridge never started | Start `WWDS.Bridge.exe` once. |

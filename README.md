@@ -14,12 +14,18 @@ Comfort mods and Twitch audience play for the PC games **"Wer weiß denn sowas? 
 - **ESC menu**: resume, save, settings, back to the main menu, quit (replaces the pause menu).
 - **Quickplay**: the player selection fills itself from a configurable line-up (keyboard, gamepads,
   game AI, Twitch) with fixed characters, and starts right away.
-- **Mouse support** on every screen: click answers, categories, bets, prompts; wheel for estimates.
-- **Keyboard shortcuts** in a show: Enter confirms, 1/2/3 answer, 1-5 master bets.
+- **Mouse support** on every screen: click answers, categories, bets, prompts; wheel for estimates,
+  character browsing, lists.
+- **Two players on one keyboard**, keyboard shortcuts (Enter confirms everywhere, digits answer and bet).
+- **More gamepads**: XInput pads with any name (e.g. GuliKit) and pads in Switch/DInput mode.
 - **Skip intro**: logo videos, optionally the show intro and the tutorial question.
 - **Game settings**: master volume, mute in background, real mute per channel, resolution, window mode,
   frame rate, VSync, quality, UI scale.
 - **Both catalogues**: own both games and each offers the other game's 30 shows as shows 31-60.
+- **Own questions**: question packs from Excel/CSV or JSON, with optional videos, as extra shows.
+- **Long show**: 2 to 4 boards of 12 categories before the final, resumable.
+- **Better sound**: audience and answer video volume, voice lines that no longer cut each other off,
+  the same loudness for every line, own recordings for any line.
 - **Welcome window** on the first start: what is installed, keys, modules on or off.
 
 **Streaming (Twitch)**
@@ -50,6 +56,7 @@ For Twitch, see [docs/twitch-setup.md](docs/twitch-setup.md).
 | Document | Content |
 |---|---|
 | [docs/mods.md](docs/mods.md) | Every mod and how to use it |
+| [docs/own-content.md](docs/own-content.md) | Own question packs and voice lines |
 | [docs/twitch-setup.md](docs/twitch-setup.md) | Twitch app, login, chat commands, bets, streamer vs viewer |
 | [docs/configuration.md](docs/configuration.md) | All settings (`BepInEx/config/wwds.harness.cfg`) |
 | [docs/installation.md](docs/installation.md) | Install, offline install, uninstall, building |

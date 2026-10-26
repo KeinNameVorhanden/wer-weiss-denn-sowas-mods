@@ -18,9 +18,13 @@ Bridge settings are in `%LOCALAPPDATA%\WWDS\bridge.json` (see `docs/twitch-setup
 | `[WhoWins]` | Bet on the winner at show start | `ChatBets`, `TwitchPrediction` (channel points), `WindowSeconds`, `StreamerLabel`, `PlayerLabel`, `AiLabel`, `TwitchLabel` |
 | `[Adapter]` | Game-side deadlines for audience decisions | `AnswerDecisionTimeout`, `MasterDecisionTimeout` (keep below 20 s), `BetDecisionTimeout`, `EstimateDecisionTimeout`, `CategoryDecisionTimeout` |
 | `[Statistics]` | Local statistics | `SaveToDisk` (BepInEx/wwds/statistics.json) |
-| `[Game]` | General game settings (see [mods.md](mods.md)) | `ManageDisplay`, `Resolution` (e.g. 1920x1080), `WindowMode` (Fullscreen/Borderless/Windowed), `FrameRateLimit` (-1 = unlimited), `VSync`, `QualityLevel` (-1 = keep), `ApplySavedVolumesAtStart`, `MuteMusic`, `MuteSfx`, `MuteVoice`, `MasterVolume` (0-1), `MuteInBackground` |
+| `[Game]` | General game settings (see [mods.md](mods.md)) | `ManageDisplay`, `Resolution` (e.g. 1920x1080), `WindowMode` (Fullscreen/Borderless/Windowed), `FrameRateLimit` (-1 = unlimited), `VSync`, `QualityLevel` (-1 = keep), `ApplySavedVolumesAtStart`, `MuteMusic`, `MuteSfx`, `MuteVoice`, `MasterVolume` (0-1), `MuteInBackground`, `AudienceVolume` (0-1, applause and crowd), `VideoVolume` (0-2.5, answer videos) |
 | `[SkipIntro]` | Intro skipping | `SkipLogos`, `SkipShowIntro`, `NoTutorialPrompt` |
 | `[Catalogue]` | Other game's shows as 31-60 | `OtherGameShows` (next start) |
+| `[Questions]` | Own question packs as shows 101+ (see [own-content.md](own-content.md)) | `OwnPacks` |
+| `[LongGame]` | Shows with several boards | `Boards` (1-4), `Source` (NextUnplayed/Random/OwnPacks/OtherGame), `JokerPerBoard` |
+| `[Voice]` | Voice lines and normalization | `WaitForSameSpeaker`, `MaxWaitSeconds`, `WaitForRealEnd`, `KeepHostOnInput`, `AudienceDuck` (0-1), `Normalize`, `TargetLevelDb`, `MaxBoostDb`, `OwnLines` (BepInEx/wwds/voices) |
+| `[Input]` | Keyboards and gamepads | `FixKeyboards` (one device per keyboard layout, Escape for both, safe name typing), `AnyXInputName`, `GenericControllers`, `GenericSwapAB` |
 | `[Quickplay]` | Configured line-up instead of the selection | `Enabled`, `TeamA1`, `TeamA2`, `TeamB1`, `TeamB2` (Empty/Keyboard/Gamepad1-4/Bot/Twitch), `TeamA1Character` ... (-1 = first free), `ShowId`, `CountdownSeconds`, `QuickResume` |
 | `[Mouse]` | Mouse support | `Enabled`, `Owner` (KeyboardPlayer/ActivePlayer), `HideAfterSeconds` |
 | `[EscMenu]` | ESC menu | `ReplacePauseMenu`, `Hotkey` (Escape), `ConfirmQuitDoor` |
@@ -28,7 +32,7 @@ Bridge settings are in `%LOCALAPPDATA%\WWDS\bridge.json` (see `docs/twitch-setup
 | `[FirstRun]` | Welcome window | `Shown`, `ShowAtEveryStart`, `LastVersion` (update notice) |
 | `[UI]` | Overlay, vote window, scale | `PanelHotkey` (F8), `PanelScale`, `MenuScale`, `HudScale`, `Toasts`, `HudHotkey` (F9), `AutoShowHud`, `ShowCorrectAnswerInPanel` (spoiler!), `StartOpen`, `DebugCycleTabsSeconds` (test aid) |
 | `[Hud]` | Vote window | `X`, `Y` (position as share of the screen, -1 = top right), `Locked`, `Opacity`, `ResultSeconds`, `ShowCommandHint` |
-| `[Keyboard]` | Show shortcuts | `ShowShortcuts` (Enter/Space = A, 1-3 answers, 1-5 master bets) |
+| `[Keyboard]` | Shortcuts | `ShowShortcuts` (Enter/Space = A, 1-3 answers, 1-5 master bets, 0 = joker), `TwoPlayerKeys` (player 1 keypad and Enter, player 2 Space and X/C/V), `EnterInMenus` |
 | `[Debug]` | Test actions | `AutoStartShow`, `ShowId`, `TeamAHuman`, `TeamABotName`, `TeamBBotName`, `TeamBLabel`, `ExternalControlTeams`, `AutoResolve`, `AutoResolveDelay`, `AutoBetOption`, `AutoAssistHumans`, `QuitAfterQuestions`, `QuitAfterShow` |
 | `[Patches]` | One switch per Harmony patch (troubleshooting after game updates) | e.g. `control.answer`, `name.persist-guard` |
 

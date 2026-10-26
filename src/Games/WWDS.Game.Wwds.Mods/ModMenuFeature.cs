@@ -88,9 +88,72 @@ public sealed class ModMenuFeature : FeatureBase
         w.Pages.Add(new MenuPage("Publikum", AudienceRows));
         w.Pages.Add(new MenuPage("Schnellstart", QuickplayRows));
         w.Pages.Add(new MenuPage("Komfort", ComfortRows));
+        w.Pages.Add(new MenuPage("Inhalte", ContentRows));
         w.Pages.Add(new MenuPage("Features", FeatureRows));
         w.Pages.Add(new MenuPage("Alle Einstellungen", SettingsRows));
         return w;
+    }
+
+    // ---- own content --------------------------------------------------------------------------------
+
+    private IEnumerable<Widget> ContentRows()
+    {
+        var longGame = Context.Get<LongGameFeature>();
+        if (longGame != null)
+        {
+            yield return new HeaderWidget("Lange Show");
+            var boards = new List<string> { "1 (normal)", "2 Bretter", "3 Bretter", "4 Bretter" };
+            yield return new CycleWidget("Bretter pro Show", boards, () => Mathf.Clamp(longGame.Boards.Value, 1, LongGameFeature.MaxBoards) - 1, i => longGame.Boards.Value = i + 1)
+            {
+                Hint = "Nach 12 Kategorien kommt ein neues Brett mit 12 neuen Kategorien; Finale und Schätzfrage erst nach dem letzten. Gilt für neue Shows, Fortsetzen geht wie gewohnt.",
+            };
+            var sources = new List<string> { "Nächste ungespielte Show", "Zufällige Show", "Eigene Fragen zuerst", "Anderes Spiel zuerst" };
+            yield return new CycleWidget("Fragen für weitere Bretter", sources, () => (int)longGame.Source.Value, i => longGame.Source.Value = (BoardSource)i);
+            yield return new ToggleWidget("Publikumsjoker pro Brett", () => longGame.ResetJoker.Value, v => longGame.ResetJoker.Value = v)
+            {
+                Hint = "Beide Teams bekommen ihren Joker auf jedem Brett zurück.",
+            };
+            yield return new InfoWidget(() => longGame.Status.Length > 0 ? "Laufende Show: " + longGame.Status : "Keine lange Show aktiv.");
+        }
+
+        var questions = Context.Get<CustomQuestionsFeature>();
+        if (questions != null)
+        {
+            yield return new HeaderWidget("Eigene Fragen");
+            yield return new InfoWidget(() => questions.Packs.Count == 0
+                ? "Noch keine Pakete. Vorlage und Anleitung liegen in " + questions.Folder
+                : questions.Packs.Count + " Paket(e), " + questions.ShowIds.Count() + " Show(s) ab Nummer " + CustomQuestionsFeature.FirstShowId + " in der Mediathek.", 2);
+            yield return new ButtonWidget("Pakete neu laden", () =>
+            {
+                questions.Reload();
+                _ui.Toast(questions.ShowIds.Count() + " eigene Show(s) geladen", 4);
+            })
+            {
+                Hint = "Liest den Ordner questions erneut ein. Neue Shows erscheinen in der Mediathek nach dem nächsten Betreten.",
+            };
+            yield return new ButtonWidget("Ordner öffnen", () => Application.OpenURL(new Uri(questions.Folder).AbsoluteUri)) { Hint = questions.Folder };
+            foreach (var pack in questions.Packs)
+            {
+                var p = pack;
+                var shows = p.ShowIds.Count == 0 ? "nicht spielbar" : "Show " + string.Join(", ", p.ShowIds.Select(i => i.ToString()).ToArray());
+                yield return new InfoWidget(p.Name + ": " + shows, 1);
+                foreach (var problem in p.Pack.Errors.Take(4)) yield return new InfoWidget("  Fehler: " + problem, 2);
+                foreach (var hint in p.Pack.Warnings.Take(3)) yield return new InfoWidget("  Hinweis: " + hint, 2);
+            }
+        }
+
+        var voices = Context.Get<CustomVoiceFeature>();
+        if (voices != null)
+        {
+            yield return new HeaderWidget("Eigene Sätze");
+            yield return new InfoWidget(() => voices.Loading ? "Lade eigene Sätze ..." : voices.Count + " eigene Sätze aus " + voices.Folder, 2);
+            yield return new ButtonWidget("Eigene Sätze neu laden", voices.Reload) { Hint = "Liest den Ordner voices erneut ein (Dateiname = Name des Satzes, .ogg oder .wav)." };
+            yield return new ButtonWidget("Satzliste exportieren", () => _ui.Toast("Gespeichert: " + voices.ExportList(), 6))
+            {
+                Hint = "Schreibt alle Satznamen in voices/_alle-saetze.txt. In einer Show auch die Sätze dieser Show.",
+            };
+        }
+
     }
 
     // ---- game ---------------------------------------------------------------------------------------
@@ -128,6 +191,15 @@ public sealed class ModMenuFeature : FeatureBase
             };
             yield return new ToggleWidget(name + " stumm", () => gs.Muted(channel), m => gs.SetMuted(channel, m));
         }
+
+        yield return new SliderWidget("Publikum", 0f, 1f, 0.05f, () => gs.AudienceVolume, v => gs.AudienceVolume = v, Percent)
+        {
+            Hint = "Applaus und Raunen des Studiopublikums, im Verhältnis zu den übrigen Effekten.",
+        };
+        yield return new SliderWidget("Antwortvideos", 0f, 2.5f, 0.05f, () => gs.VideoVolume, v => gs.VideoVolume = v, Percent)
+        {
+            Hint = "Die Erklärvideos nach jeder Frage. 100 % = wie im Spiel (es spielt sie fest leiser ab), bis 250 %.",
+        };
 
         yield return new HeaderWidget("Anzeige");
         yield return new CycleWidget("Auflösung", gs.Resolutions, () => gs.Resolutions().IndexOf(gs.CurrentResolution), i => gs.SetResolution(gs.Resolutions()[i]))

@@ -11,14 +11,14 @@
 .PARAMETER Game         Game1 or Game2.
 .PARAMETER Timeout      Seconds before the game is closed.
 .PARAMETER NoStage      Skip staging (use the current artifacts/payload).
-.PARAMETER Mode         Full | Screens (menu captures) | Catalogue (show 31 from the other game).
+.PARAMETER Mode         Full | Screens (menu captures) | Catalogue (show 31 from the other game) | Custom (a temporary own question pack) | Long (long show with 2 short boards, resume).
 .PARAMETER RestoreOnly  Only undo an interrupted run.
 #>
 param(
     [ValidateSet('Game1', 'Game2')][string]$Game = 'Game1',
     [int]$Timeout = 420,
     [switch]$NoStage,
-    [ValidateSet('Full', 'Screens', 'Catalogue')][string]$Mode = 'Full',
+    [ValidateSet('Full', 'Screens', 'Catalogue', 'Custom', 'Long')][string]$Mode = 'Full',
     [string]$ScreenshotDir = '',
     [switch]$RestoreOnly
 )
@@ -35,6 +35,11 @@ $cfg = Join-Path $gameDir 'BepInEx\config\wwds.harness.cfg'
 $log = Join-Path $gameDir 'BepInEx\LogOutput.log'
 $backup = Join-Path $root ('artifacts\selftest-backup\' + $Game)
 $pending = Join-Path $backup 'pending.txt'
+$packDir = Join-Path $gameDir 'BepInEx\wwds\questions\zz-selftest'
+$dataDir = Join-Path $gameDir 'BepInEx\wwds'
+$voiceDir = Join-Path $gameDir 'BepInEx\wwds\voices\zz-selftest'
+# Mod data files a run may change (pack show ids, long show boards): put back exactly as they were.
+$dataFiles = @('question-packs.txt', 'long-games.txt')
 
 # Keys the test sets (section, key, value). Only these are ever put back.
 $testKeys = @(
@@ -48,6 +53,8 @@ $testKeys = @(
     @('Twitch', 'Mode', 'Off'),
     @('General', 'RunInBackground', 'true'),
     @('Game', 'ManageDisplay', 'false'),
+    @('Game', 'MuteInBackground', 'false'),
+    @('Game', 'MasterVolume', '1'),
     @('Quickplay', 'Enabled', 'true'),
     @('Quickplay', 'TeamA1', 'Keyboard'),
     @('Quickplay', 'TeamA2', 'Empty'),
@@ -55,6 +62,9 @@ $testKeys = @(
     @('Quickplay', 'TeamB2', 'Empty'),
     @('Quickplay', 'ShowId', $(if ($Mode -eq 'Catalogue') { '31' } else { '-1' })),
     @('Catalogue', 'OtherGameShows', 'true'),
+    @('LongGame', 'Boards', $(if ($Mode -eq 'Long') { '2' } else { '1' })),
+    @('LongGame', 'Source', 'NextUnplayed'),
+    @('Quickplay', 'QuickResume', 'true'),
     @('Opponent', 'Active', 'false'),
     @('Debug', 'AutoStartShow', 'false')
 )
@@ -126,6 +136,16 @@ function Restore-FromBackup([bool]$restoreSaves) {
         foreach ($f in $savedFiles) { Copy-Item -LiteralPath (Join-Path (Join-Path $backup 'saves') $f) -Destination (Join-Path $saveDir $f) -Force }
     }
 
+    # The temporary question pack and its show id.
+    if (Test-Path -LiteralPath $packDir) { Remove-Item -LiteralPath $packDir -Recurse -Force }
+    if (Test-Path -LiteralPath $voiceDir) { Remove-Item -LiteralPath $voiceDir -Recurse -Force }
+    foreach ($name in $dataFiles) {
+        $live = Join-Path $dataDir $name
+        $copy = Join-Path (Join-Path $backup 'data') $name
+        if (Test-Path -LiteralPath $copy) { Copy-Item -LiteralPath $copy -Destination $live -Force }
+        elseif ((Test-Path -LiteralPath (Join-Path (Join-Path $backup 'data') ($name + '.absent'))) -and (Test-Path -LiteralPath $live)) { Remove-Item -LiteralPath $live -Force }
+    }
+
     Remove-Item -LiteralPath $pending -Force -ErrorAction SilentlyContinue
 }
 
@@ -157,7 +177,39 @@ if (Test-Path -LiteralPath $regPath) {
     }
 }
 ConvertTo-Json -InputObject @($regValues) | Set-Content -LiteralPath (Join-Path $backup 'registry.json') -Encoding UTF8
+New-Item -ItemType Directory -Force (Join-Path $backup 'data') | Out-Null
+foreach ($name in $dataFiles) {
+    $live = Join-Path $dataDir $name
+    if (Test-Path -LiteralPath $live) { Copy-Item -LiteralPath $live -Destination (Join-Path (Join-Path $backup 'data') $name) }
+    else { Set-Content -LiteralPath (Join-Path (Join-Path $backup 'data') ($name + '.absent')) -Value 'none' }
+}
 Set-Content -LiteralPath $pending -Value (Get-Date -Format o)
+
+if ($Mode -eq 'Custom') {
+    # 12 questions (half with a video file that does not exist: must be skipped), a final, an estimate.
+    New-Item -ItemType Directory -Force $packDir | Out-Null
+    $rows = @('Typ;Kategorie;Thema;Frage;A;B;C;Richtig;Video;Reaktion')
+    for ($i = 1; $i -le 12; $i++) {
+        $video = if ($i % 2 -eq 0) { 'videos/fehlt.mp4' } else { '' }
+        $rows += "Frage;Test $i;Tiere;Selbsttest Frage $i?;Alpha;Beta;Gamma;C;$video;3"
+    }
+    $rows += 'Finale;Finale;Weltweit;Selbsttest Finale?;Eins;Zwei;Drei;B;;'
+    $rows += 'Schaetzfrage;;;Selbsttest Schaetzung?;;;;250;;'
+    Set-Content -LiteralPath (Join-Path $packDir 'questions.csv') -Value $rows -Encoding UTF8
+
+    # An own voice line: 0.5 s of a quiet 440 Hz tone as 16-bit mono WAV.
+    New-Item -ItemType Directory -Force $voiceDir | Out-Null
+    $rate = 22050
+    $count = [int]($rate / 2)
+    $ms = [System.IO.MemoryStream]::new()
+    $w = [System.IO.BinaryWriter]::new($ms)
+    $w.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF')); $w.Write([int](36 + 2 * $count)); $w.Write([System.Text.Encoding]::ASCII.GetBytes('WAVEfmt '))
+    $w.Write([int]16); $w.Write([int16]1); $w.Write([int16]1); $w.Write([int]$rate); $w.Write([int](2 * $rate)); $w.Write([int16]2); $w.Write([int16]16)
+    $w.Write([System.Text.Encoding]::ASCII.GetBytes('data')); $w.Write([int](2 * $count))
+    for ($i = 0; $i -lt $count; $i++) { $w.Write([int16](3000 * [Math]::Sin(2 * [Math]::PI * 440 * $i / $rate))) }
+    $w.Flush()
+    [System.IO.File]::WriteAllBytes((Join-Path $voiceDir 'wwds_selftest_line.wav'), $ms.ToArray())
+}
 
 foreach ($k in $testKeys) { Set-Ini $cfg $k[0] $k[1] $k[2] }
 
