@@ -9,6 +9,7 @@ using UnityEngine.Audio;
 using UnityEngine.SceneManagement;
 using WWDS.ModCore.Config;
 using WWDS.ModCore.Features;
+using WWDS.ModCore.Model;
 using WWDS.Runtime.Patching;
 
 namespace WWDS.Game.Wwds.Mods;
@@ -29,7 +30,11 @@ public enum WindowMode
 public sealed class GameSettingsFeature : FeatureBase
 {
     public const string FeatureId = "GameSettings";
-    public static readonly int[] FrameRates = { 30, 60, 75, 120, 144, 165, 240, -1 };
+    /// <summary>Frame rate choices of the mod menu: 0 = monitor refresh rate, -1 = unlimited.</summary>
+    public static readonly int[] FrameRates = { FrameCap.Monitor, 30, 60, 75, 90, 120, 144, 165, 240, FrameCap.Unlimited };
+
+    /// <summary>Background frame rate choices: 0 = same as in front.</summary>
+    public static readonly int[] BackgroundFrameRates = { 0, 10, 15, 30, 60 };
 
     private static GameSettingsFeature? _current;
     private IConfigValue<bool> _manageDisplay = null!;
@@ -37,6 +42,7 @@ public sealed class GameSettingsFeature : FeatureBase
     private IConfigValue<WindowMode> _windowMode = null!;
     private IConfigValue<int> _frameRate = null!;
     private IConfigValue<bool> _vsync = null!;
+    private IConfigValue<int> _backgroundFrameRate = null!;
     private IConfigValue<int> _quality = null!;
     private IConfigValue<bool> _applyVolumes = null!;
     private IConfigValue<bool> _muteMusic = null!;
@@ -47,6 +53,8 @@ public sealed class GameSettingsFeature : FeatureBase
     private IConfigValue<float> _audience = null!;
     private IConfigValue<float> _video = null!;
     private float _applauseBase = 1f;
+    private bool _applauseStarting;
+    private Coroutine? _applauseFade;
     private float _duck = 1f;
     private AudioSource? _videoSource;
     private GameObject? _focus;
@@ -71,8 +79,9 @@ public sealed class GameSettingsFeature : FeatureBase
         _manageDisplay = c.Bind(s, "ManageDisplay", false, "Apply the display settings below at start (set automatically when changed in the mod menu).");
         _resolution = c.Bind(s, "Resolution", "", "Width x height, e.g. 1920x1080 (empty = keep).");
         _windowMode = c.Bind(s, "WindowMode", WindowMode.Fullscreen, "Fullscreen | Borderless | Windowed (the game itself only knows fullscreen).");
-        _frameRate = c.Bind(s, "FrameRateLimit", 60, "Frame rate cap (the game uses 60); -1 = unlimited.");
-        _vsync = c.Bind(s, "VSync", false, "Vertical sync (overrides the frame rate cap).");
+        _frameRate = c.Bind(s, "FrameRateLimit", 60, "Frame rate cap, always applied (the game itself never caps): frames per second, 0 = monitor refresh rate, -1 = unlimited.");
+        _vsync = c.Bind(s, "VSync", false, "Vertical sync (overrides the frame rate cap while the window is in front).");
+        _backgroundFrameRate = c.Bind(s, "BackgroundFrameRate", 30, "Frame rate cap while the window is in the background (saves power when streaming or alt-tabbed); 0 = same as in front.");
         _quality = c.Bind(s, "QualityLevel", -1, "Unity quality level index (-1 = keep the game's).");
         _applyVolumes = c.Bind(s, "ApplySavedVolumesAtStart", true, "Push the saved music/SFX/voice volumes to the mixer at start (the game only does so when its menus open).");
         _muteMusic = c.Bind(s, "MuteMusic", false, "Silence music completely (the game's lowest volume step is still audible).");
@@ -84,7 +93,11 @@ public sealed class GameSettingsFeature : FeatureBase
         _video = c.Bind(s, "VideoVolume", 1f, "Answer videos relative to the game's level, 0 to 2.5 (the game plays them at a fixed 40 %, outside its volume settings).");
         _focus = new GameObject("WWDS_Focus");
         UnityEngine.Object.DontDestroyOnLoad(_focus);
-        _focus.AddComponent<FocusWatcher>().Changed += _ => ApplyMaster();
+        _focus.AddComponent<FocusWatcher>().Changed += _ =>
+        {
+            ApplyMaster();
+            ApplyFrameSettings();
+        };
         ApplyMaster();
         _ui = ModUi.For(Context);
         _current = this;
@@ -107,6 +120,7 @@ public sealed class GameSettingsFeature : FeatureBase
         PatchAudience();
         SceneManager.sceneLoaded += OnSceneLoaded;
         if (_manageDisplay.Value) ApplyDisplay();
+        else ApplyFrameSettings();
     }
 
     protected override void OnStop()
@@ -119,6 +133,7 @@ public sealed class GameSettingsFeature : FeatureBase
 
     public override void Tick()
     {
+        _applauseStarting = false;
         ApplyMaster();
         if (_volumesApplied || !_applyVolumes.Value || SDataStore.Instance == null || SSoundManager.Instance == null) return;
         if (_ui.State.Length == 0 || _ui.State == "StateInit") return;
@@ -133,7 +148,7 @@ public sealed class GameSettingsFeature : FeatureBase
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         // GraphicsController.Awake resets the frame cap and vsync whenever its scene loads.
-        if (_manageDisplay.Value) ApplyFrameSettings();
+        ApplyFrameSettings();
     }
 
     // ---- volumes ------------------------------------------------------------------------------------
@@ -313,7 +328,7 @@ public sealed class GameSettingsFeature : FeatureBase
     private void UpdateApplause()
     {
         var source = Field<AudioSource>("SFXApplauseAudioSource");
-        if (source != null && source.isPlaying) source.volume = _applauseBase * AudienceLevel;
+        if (source != null && source.isPlaying && _applauseFade == null) source.volume = _applauseBase * AudienceLevel;
     }
 
     /// <summary>Answer videos, 0..2.5 of the game's fixed 40 % (so at most full volume).</summary>
@@ -344,6 +359,11 @@ public sealed class GameSettingsFeature : FeatureBase
         {
             Prefix = AccessTools.Method(typeof(GameSettingsFeature), nameof(ApplausePrefix)),
         });
+        _ui.Patch(new PatchSpec("mods.audience.applause-fade", "Applause fades out instead of stopping dead.",
+            () => AccessTools.Method(typeof(SSoundManager), nameof(SSoundManager.StopApplause)), none)
+        {
+            Prefix = AccessTools.Method(typeof(GameSettingsFeature), nameof(StopApplausePrefix)),
+        });
         _ui.Patch(new PatchSpec("mods.audience.sfx", "Scale audience reactions (aah/ooh/uuh) by the audience volume.",
             () => AccessTools.Method(typeof(SSoundManager), "PlaySFX", new[] { typeof(AudioClip), typeof(float) }), none)
         {
@@ -369,6 +389,39 @@ public sealed class GameSettingsFeature : FeatureBase
         if (f == null) return;
         f._applauseBase = volume;
         volume *= f.AudienceLevel;
+        // The new applause stops the old one right away (no fade over the new clip).
+        f._applauseStarting = true;
+        f.CancelApplauseFade();
+    }
+
+    private static bool StopApplausePrefix()
+    {
+        var f = _current;
+        if (f == null || f._applauseStarting || f._focus == null) return true;
+        var source = Field<AudioSource>("SFXApplauseAudioSource");
+        if (source == null || !source.isPlaying || f._applauseFade != null) return f._applauseFade == null;
+        f._applauseFade = f._focus.GetComponent<FocusWatcher>().StartCoroutine(f.FadeApplause(source));
+        return false;
+    }
+
+    private System.Collections.IEnumerator FadeApplause(AudioSource source)
+    {
+        var start = source.volume;
+        for (var t = 0f; t < 0.6f && source != null; t += Time.unscaledDeltaTime)
+        {
+            source.volume = start * (1f - (t / 0.6f));
+            yield return null;
+        }
+
+        _applauseFade = null;
+        if (source != null) SSoundManager.Instance.StopSound(source, unloadSound: false);
+    }
+
+    private void CancelApplauseFade()
+    {
+        if (_applauseFade == null || _focus == null) return;
+        _focus.GetComponent<FocusWatcher>().StopCoroutine(_applauseFade);
+        _applauseFade = null;
     }
 
     private static void AudienceSfxPrefix(AudioClip sound, ref float volume)
@@ -399,9 +452,11 @@ public sealed class GameSettingsFeature : FeatureBase
 
     public WindowMode CurrentWindowMode => _manageDisplay.Value ? _windowMode.Value : Screen.fullScreen ? WindowMode.Fullscreen : WindowMode.Windowed;
 
-    public int FrameRate => _manageDisplay.Value ? _frameRate.Value : Application.targetFrameRate;
+    public int FrameRate => _frameRate.Value;
 
-    public bool VSync => _manageDisplay.Value ? _vsync.Value : QualitySettings.vSyncCount > 0;
+    public int BackgroundFrameRate => _backgroundFrameRate.Value;
+
+    public bool VSync => _vsync.Value;
 
     public int Quality => QualitySettings.GetQualityLevel();
 
@@ -420,14 +475,23 @@ public sealed class GameSettingsFeature : FeatureBase
     public void SetFrameRate(int fps)
     {
         _frameRate.Value = fps;
-        Manage();
+        ApplyFrameSettings();
+    }
+
+    public void SetBackgroundFrameRate(int fps)
+    {
+        _backgroundFrameRate.Value = fps;
+        ApplyFrameSettings();
     }
 
     public void SetVSync(bool on)
     {
         _vsync.Value = on;
-        Manage();
+        ApplyFrameSettings();
     }
+
+    /// <summary>Refresh rate of the monitor the game is on (Hz), 0 if unknown.</summary>
+    public static int RefreshRate => Screen.currentResolution.refreshRate;
 
     public void SetQuality(int level)
     {
@@ -464,8 +528,9 @@ public sealed class GameSettingsFeature : FeatureBase
 
     private void ApplyFrameSettings()
     {
-        QualitySettings.vSyncCount = _vsync.Value ? 1 : 0;
-        Application.targetFrameRate = _frameRate.Value;
+        if (_focus != null) _focused = _focus.GetComponent<FocusWatcher>().Focused;
+        QualitySettings.vSyncCount = FrameCap.VSyncCount(_vsync.Value, _focused);
+        Application.targetFrameRate = FrameCap.Target(_frameRate.Value, _backgroundFrameRate.Value, _focused, RefreshRate);
     }
 
     private static FullScreenMode ToUnity(WindowMode mode) => mode switch

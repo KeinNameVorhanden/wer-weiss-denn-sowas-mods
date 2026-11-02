@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Audio;
@@ -31,6 +32,11 @@ public sealed class VoiceFeature : FeatureBase
     private IConfigValue<bool> _keepHost = null!;
     private IConfigValue<float> _duck = null!;
     private float _duckLevel = 1f;
+    private IConfigValue<bool> _rememberHeard = null!;
+    private string? _historyFile;
+    private bool _historyLoaded;
+    private bool _historyDirty;
+    private float _historySaveAt;
 
     public override string Id => FeatureId;
 
@@ -52,6 +58,8 @@ public sealed class VoiceFeature : FeatureBase
         _waitForEnd = c.Bind(s, "WaitForRealEnd", true, "When the game waits for a line, wait until it is really over (streamed lines start late).");
         _keepHost = c.Bind(s, "KeepHostOnInput", true, "Moving the selection silences contestants and captains but lets the host finish.");
         _duck = c.Bind(s, "AudienceDuck", 0.5f, "Audience level while someone speaks (1 = no change, 0.5 = half).");
+        _rememberHeard = c.Bind(s, "RememberHeardLines", true, "Generic lines (captains, host, contestants) are not repeated before all others of their kind were heard, across sessions.");
+        if (Context.Host?.DataDirectory is { } dir) _historyFile = System.IO.Path.Combine(dir, "voice-history.txt");
         _current = this;
         Context.Provide(this);
         var ui = ModUi.For(Context);
@@ -72,6 +80,11 @@ public sealed class VoiceFeature : FeatureBase
         {
             Postfix = AccessTools.Method(typeof(VoiceFeature), nameof(PlayPostfix)),
         });
+        ui.Patch(new PatchSpec("mods.voice.pool", "Remember which generic lines were heard (saved across sessions).",
+            () => AccessTools.Method(t, "GetSoundFromAudioPool"), none)
+        {
+            Postfix = AccessTools.Method(typeof(VoiceFeature), nameof(PoolPostfix)),
+        });
         ui.Patch(new PatchSpec("mods.voice.stop", "Player input silences the reactions, not the host.",
             () => AccessTools.Method(t, nameof(SSoundManager.StopAllVoices)), none)
         {
@@ -81,18 +94,86 @@ public sealed class VoiceFeature : FeatureBase
 
     protected override void OnStop()
     {
+        SaveHistory();
         _current = null;
         Context.Get<GameSettingsFeature>()?.SetAudienceDuck(1f);
     }
 
     public override void Tick()
     {
+        LoadHistory();
+        if (_historyDirty && Time.unscaledTime >= _historySaveAt) SaveHistory();
         var target = AnyVoicePlaying() ? Mathf.Clamp01(_duck.Value) : 1f;
         if (Mathf.Approximately(target, _duckLevel)) return;
         // About 0.2 s down, 0.6 s back up.
         var speed = target < _duckLevel ? 2.5f : 0.8f;
         _duckLevel = Mathf.MoveTowards(_duckLevel, target, speed * Time.unscaledDeltaTime);
         Context.Get<GameSettingsFeature>()?.SetAudienceDuck(_duckLevel);
+    }
+
+    private static Dictionary<string, List<int>>? Pool()
+    {
+        var sound = GameSettingsFeature.ExistingSound;
+        return sound == null ? null : AccessTools.Field(typeof(SSoundManager), "voicePoolCache").GetValue(sound) as Dictionary<string, List<int>>;
+    }
+
+    /// <summary>Puts the saved history into the game's pool memory once its sound manager exists.</summary>
+    private void LoadHistory()
+    {
+        if (_historyLoaded || !_rememberHeard.Value || _historyFile == null) return;
+        var sound = GameSettingsFeature.ExistingSound;
+        if (sound == null) return;
+        _historyLoaded = true;
+        var pool = Pool() ?? new Dictionary<string, List<int>>();
+        try
+        {
+            if (System.IO.File.Exists(_historyFile))
+            {
+                foreach (var line in System.IO.File.ReadAllLines(_historyFile))
+                {
+                    var tab = line.IndexOf('\t');
+                    if (tab <= 0) continue;
+                    var heard = new List<int>();
+                    foreach (var part in line.Substring(tab + 1).Split(','))
+                    {
+                        if (int.TryParse(part, out var i)) heard.Add(i);
+                    }
+
+                    pool[line.Substring(0, tab)] = heard;
+                }
+            }
+
+            AccessTools.Field(typeof(SSoundManager), "voicePoolCache").SetValue(sound, pool);
+            Log.Info("Voice history: " + pool.Count + " line groups remembered");
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warn("Voice history could not be read: " + ex.Message);
+        }
+    }
+
+    private void SaveHistory()
+    {
+        if (!_historyDirty || _historyFile == null) return;
+        _historyDirty = false;
+        var pool = Pool();
+        if (pool == null) return;
+        try
+        {
+            System.IO.File.WriteAllLines(_historyFile, pool.Select(p => p.Key + "\t" + string.Join(",", p.Value.Select(i => i.ToString()).ToArray())).ToArray());
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warn("Voice history could not be saved: " + ex.Message);
+        }
+    }
+
+    private static void PoolPostfix()
+    {
+        var self = _current;
+        if (self == null || !self._rememberHeard.Value) return;
+        if (!self._historyDirty) self._historySaveAt = Time.unscaledTime + 15f;
+        self._historyDirty = true;
     }
 
     private static Dictionary<EVoiceType, AudioSource>? Sources()

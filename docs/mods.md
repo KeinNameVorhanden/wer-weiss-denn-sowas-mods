@@ -34,10 +34,14 @@ Pages:
 - **Spiel**: overall volume (on top of the game's settings) and "Stumm im Hintergrund" (silence while the
   game window is not in front); music, effects and voice volume in the game's own 10 steps plus a real mute for each;
   audience and answer video volume (see Sound);
-  resolution, window mode (fullscreen, borderless, windowed), frame rate limit (the game caps at 60),
-  VSync, quality level; keep running in the background. Display settings are only managed by the mod
+  resolution, window mode (fullscreen, borderless, windowed), frame rate (see below), VSync, quality
+  level, ultrawide; keep running in the background. Resolution and window mode are only managed by the mod
   after you change one of them here; then they are restored at every start and the Tech room no longer
   forces fullscreen. Saved volumes are applied at start (the game forgets this until a menu opens).
+- **Frame rate**: the game itself never limits its frame rate (over 250 FPS in the menus, a busy
+  graphics card for a quiz). The mod's limit always applies: `[Game] FrameRateLimit` (default 60,
+  "Bildschirm" = the monitor's refresh rate, -1 = unlimited) and a lower limit while the window is in
+  the background (`BackgroundFrameRate`, default 30). VSync overrides the limit while in front.
 - **Twitch**: connection and account status, Client ID, login (shows the device code and opens
   twitch.tv/activate), logout, connection mode, IRC channel, test mode, bridge dry run. See
   [twitch-setup.md](twitch-setup.md).
@@ -45,7 +49,8 @@ Pages:
   rules), answer votes and polls, how `!vote 1500` numbers are combined, who-wins bets.
 - **Schnellstart**: the quickplay line-up (below).
 - **Komfort**: skip intro, mouse, ESC menu and hotkeys.
-- **Inhalte**: long show, own question packs, own voice lines.
+- **Inhalte**: save backups, long show, own question packs, own voice lines.
+- **Tasten**: free keys for both keyboard players.
 - **Features**: every module on or off.
 - **Alle Einstellungen**: every harness setting, grouped by section, edited in place; each section can be
   reset to its defaults.
@@ -165,6 +170,13 @@ Outside a show, Enter confirms on the screens that only reacted to J (player slo
 Tech room, archive; `EnterInMenus`). While a name is typed, both keyboards only react to Enter and
 Escape, so letters can no longer press buttons.
 
+## Key bindings
+
+Mod menu page **Tasten** (`[Keys]`): every button of both keyboard players (directions, A, B, X, Y and
+the two shoulder keys) and player 2's answer keys can be put on any key: select the row, press Enter,
+then the new key (Escape cancels). Keys used twice are marked. The game's key symbols follow the new
+keys (drawn key caps). Escape, Enter and the mod's hotkeys stay fixed.
+
 ## Gamepads
 
 The game recognizes pads by their name only and ignored many (for example a GuliKit in X mode, named
@@ -176,6 +188,10 @@ The game recognizes pads by their name only and ignored many (for example a Guli
   right = B, left = X, top = Y, shoulders, triggers, Select/Start, left stick and D-pad.
   `GenericSwapAB` swaps A and B if your pad reports them the other way round (restart needed).
 - The log (`BepInEx/LogOutput.log`) lists every input device at start and each pad that connects.
+
+Worn sticks that drift no longer scroll menus by themselves: `StickDeadZone` (default 0.3) ignores
+small stick movements. Unknown pads show Xbox button symbols. On the player selection screen a hint lists
+how every device joins (`JoinHint`).
 
 Without the mods, Steam Input (game properties > Controller > enable Steam Input) also helps: it
 presents the pad as an Xbox 360 controller, which the game knows (that is why Remote Play worked).
@@ -203,6 +219,54 @@ Clicks become controller presses of the player the mouse belongs to (`Owner`: th
 - The game's own pointer handling of buttons is switched off while mouse support is on: it ignored turn
   and category rules.
 
+## Skip and fast-forward
+
+In a show (`[Skip]`): **tap Tab** (or press the right stick on a pad) to end the running answer video,
+or the line being spoken. **Hold** it to fast-forward everything that does not wait for a player (talk,
+animations, reveals) at `Speed` (default 4x, silent). It never acts while a player answers, bets or
+estimates (the final's clock would run faster) or while the game is paused. `AutoSkipVideos` skips
+every answer video. The key can be changed on the Komfort page.
+
+## Final bet and estimate
+
+- **Free final bet** (`[MasterBet] FreeAmount`): the middle choice (B) is a free amount. It starts at
+  50 % of your score; up and down (stick, arrow keys, W/S) or the mouse wheel change it in steps of
+  `Step` (50 EUR, faster when held); B logs it in. 1 EUR, 25, 75 and 100 % stay as they are.
+- **Estimate** (`[Estimate]`): a team's logged-in number stays hidden ("???") from the other team
+  until the reveal (`HideOtherTeam`). When both are equally far off, the game always let Team Elton
+  win; now the team that logged in its final number first wins (`Tie = FirstLoggedIn`, or `TeamB`).
+
+## Captains and audience joker
+
+- **Fair captains** (`[Captains]`): the question-specific remarks of Elton and Hoecker were recorded
+  knowing the answer, so their verdict gave it away. With `NoAnswerHints` (default) they comment with
+  their general lines in a random mood. `AiSaysWhatItPicks`: the game's AI praises only the answer it
+  takes (it could praise two and take the second).
+- **Audience joker** (`[Joker] Accuracy`): the game rates every audience member's reliability (50 to
+  100 %) but a bug made the joker always right. Default 0 = each member's own reliability; 1 to 99 = a
+  fixed percentage; 100 = always right (as shipped). If nobody can control the audience picker, the
+  member is picked automatically after 5 seconds (the game could hang there).
+
+## Answer videos
+
+`[Video] Watchdog` (default on): videos wait for their first picture (the game started the sound over a
+black screen) and drop late frames instead of falling behind; a video that has not started after
+`StartTimeoutSeconds` is restarted once and then skipped, a decoder error skips it at once.
+
+## Save backups
+
+Mod menu, page **Inhalte** (`[Saves]`): at every start the saves are copied to `BepInEx/wwds/backups`
+when they changed (`KeepBackups`, default 10). "Wiederherstellen" puts a backup back at the next start,
+before the game reads its saves (the current state is backed up first). With a **cloud folder**
+(`MirrorFolder`, for example in OneDrive or Dropbox) every change is copied there, and a newer state
+from there (your other PC) is taken over at start. The games have no Steam Cloud.
+
+## Ultrawide
+
+Mod menu, page **Spiel**, "Breitbild" (`[Display] Ultrawide`): on screens wider than 16:9 the game's
+menus and prompts scaled with the width and were cut off at the top and bottom. `Auto` (default) makes
+them fit the height; `Pillarbox` also keeps the picture at 16:9 with black side bars.
+
 ## Sound
 
 Page **Spiel** of the mod menu, `[Game]` and `[Voice]`:
@@ -215,6 +279,10 @@ Page **Spiel** of the mod menu, `[Game]` and `[Voice]`:
   (`WaitForSameSpeaker`, at most `MaxWaitSeconds`) instead of cutting it off; where the game waits for a
   line it now waits until it is really over (`WaitForRealEnd`, streamed lines start late); moving the
   selection silences contestants and captains but lets the host finish (`KeepHostOnInput`).
+- **No repeats** (`[Voice] RememberHeardLines`): the general lines of host, captains and contestants
+  are not repeated before all others of their kind were heard; this memory is kept across sessions.
+  Every line starts with a short fade-in (the recordings often start mid-sound) and applause fades out
+  instead of stopping dead.
 - **Normalization** (`[Voice] Normalize`): every voice line is brought to the same loudness
   (`TargetLevelDb`, quiet lines raised by up to `MaxBoostDb`) and peaks are limited. The game streams its
   voice files, so each line is measured the first time it plays and remembered in

@@ -89,9 +89,47 @@ public sealed class ModMenuFeature : FeatureBase
         w.Pages.Add(new MenuPage("Schnellstart", QuickplayRows));
         w.Pages.Add(new MenuPage("Komfort", ComfortRows));
         w.Pages.Add(new MenuPage("Inhalte", ContentRows));
+        w.Pages.Add(new MenuPage("Tasten", KeyRows));
         w.Pages.Add(new MenuPage("Features", FeatureRows));
         w.Pages.Add(new MenuPage("Alle Einstellungen", SettingsRows));
         return w;
+    }
+
+    // ---- keys ---------------------------------------------------------------------------------------
+
+    private static readonly Dictionary<string, string> ButtonNames = new()
+    {
+        ["Up"] = "Hoch", ["Down"] = "Runter", ["Left"] = "Links", ["Right"] = "Rechts",
+        ["A"] = "A: bestätigen, Antwort C", ["B"] = "B: zurück, Antwort B", ["X"] = "X", ["Y"] = "Y: Antwort A",
+        ["LB"] = "LB: Team links, Joker", ["RB"] = "RB: Team rechts, Joker",
+        ["AnswerA"] = "Antwort A (zu zweit)", ["AnswerB"] = "Antwort B (zu zweit)", ["AnswerC"] = "Antwort C (zu zweit)",
+    };
+
+    private IEnumerable<Widget> KeyRows()
+    {
+        var keys = Context.Get<KeyBindingsFeature>();
+        if (keys == null)
+        {
+            yield return new InfoWidget("Feature 'KeyBindings' ist ausgeschaltet (Seite Features).");
+            yield break;
+        }
+
+        yield return new InfoWidget("Zeile wählen, Enter, dann die neue Taste drücken (Escape bricht ab). Escape und Enter bleiben fest; die Tastensymbole im Spiel zeigen die neue Belegung.", 2);
+        foreach (var player in new[] { 1, 2 })
+        {
+            var p = player;
+            yield return new HeaderWidget(p == 1 ? "Spieler 1 (Pfeiltasten)" : "Spieler 2 (WASD)");
+            foreach (var button in WWDS.ModCore.Input.KeyBindings.Buttons.Concat(p == 2 ? WWDS.ModCore.Input.KeyBindings.P2Shortcuts : new string[0]))
+            {
+                var b = button;
+                yield return new KeyCaptureWidget(ButtonNames[b], () => WWDS.ModCore.Input.KeyBindings.Label(keys.Get(p, b)) + "  " + keys.Get(p, b), k => keys.Set(p, b, k))
+                {
+                    Warn = () => keys.Conflicts().Contains(KeyBindingsFeature.Name(p, b)),
+                };
+            }
+        }
+
+        yield return new ButtonWidget("Alle Tasten auf Standard", () => _window!.Confirm("Alle Tasten beider Spieler auf die Belegung des Spiels zurücksetzen?", "Zurücksetzen", keys.ResetAll));
     }
 
     // ---- own content --------------------------------------------------------------------------------
@@ -114,6 +152,37 @@ public sealed class ModMenuFeature : FeatureBase
                 Hint = "Beide Teams bekommen ihren Joker auf jedem Brett zurück.",
             };
             yield return new InfoWidget(() => longGame.Status.Length > 0 ? "Laufende Show: " + longGame.Status : "Keine lange Show aktiv.");
+        }
+
+        var saves = Context.Get<SaveBackupFeature>();
+        if (saves != null)
+        {
+            yield return new HeaderWidget("Spielstände");
+            yield return new InfoWidget(() => saves.PendingRestore.Length > 0
+                ? "Beim nächsten Start wird " + saves.PendingRestore + " wiederhergestellt."
+                : saves.Backups().Count + " Sicherungen (bei jedem Start, wenn sich etwas geändert hat).", 2);
+            yield return new ButtonWidget("Jetzt sichern", () =>
+            {
+                var name = saves.Backup("manuell", onlyIfChanged: false);
+                _ui.Toast(name.Length > 0 ? "Gesichert: " + name : "Keine Spielstände gefunden", 4);
+            });
+            yield return new ButtonWidget("Ordner der Sicherungen öffnen", () => Application.OpenURL(new Uri(saves.BackupFolder).AbsoluteUri)) { Hint = saves.BackupFolder };
+            foreach (var backup in saves.Backups().Take(6))
+            {
+                var b = backup;
+                yield return new ButtonWidget("Wiederherstellen: " + b, () => _window!.Confirm(
+                    "Spielstände aus " + b + " beim nächsten Start zurückholen? Der jetzige Stand wird vorher gesichert.", "Vormerken", () =>
+                    {
+                        saves.RestoreAtNextStart(b);
+                        _ui.Toast("Wird beim nächsten Start wiederhergestellt. Spiel jetzt beenden (ESC-Menü).", 6);
+                    }));
+            }
+
+            yield return new ButtonWidget("Vormerkung aufheben", saves.CancelRestore) { VisibleWhen = () => saves.PendingRestore.Length > 0 };
+            yield return new TextFieldWidget("Cloud-Ordner", () => saves.MirrorFolder.Value, v => saves.MirrorFolder.Value = v, 260)
+            {
+                Hint = "Z. B. ein Ordner in OneDrive oder Dropbox: Jede Änderung wird dorthin kopiert, ein neuerer Stand von dort (anderer PC) beim Start übernommen.",
+            };
         }
 
         var questions = Context.Get<CustomQuestionsFeature>();
@@ -207,10 +276,25 @@ public sealed class ModMenuFeature : FeatureBase
             Hint = "Wird sofort angewendet und beim Start wiederhergestellt.",
         };
         yield return CycleWidget.ForEnum("Fenstermodus", () => gs.CurrentWindowMode, gs.SetWindowMode);
-        var rates = GameSettingsFeature.FrameRates.Select(r => r < 0 ? "Unbegrenzt" : r + " FPS").ToList();
-        yield return new CycleWidget("Bildrate", rates, () => Array.IndexOf(GameSettingsFeature.FrameRates, gs.FrameRate), i => gs.SetFrameRate(GameSettingsFeature.FrameRates[i]))
+        var wide = Context.Get<UltrawideFeature>();
+        if (wide != null)
         {
-            Hint = "Das Spiel begrenzt auf 60 FPS. Mit VSync zählt die Bildwiederholrate des Monitors.",
+            var modes = new List<string> { "Aus (wie im Spiel)", "Menüs passen in die Höhe", "16:9 mit schwarzen Rändern" };
+            yield return new CycleWidget("Breitbild (21:9)", modes, () => (int)wide.Mode.Value, i => wide.Mode.Value = (UltrawideMode)i)
+            {
+                Hint = "Nur bei Bildschirmen breiter als 16:9: Das Spiel schneidet dort Menüs oben und unten ab.",
+            };
+        }
+        IList<string> Rates() => GameSettingsFeature.FrameRates
+            .Select(r => r == 0 ? "Bildschirm (" + GameSettingsFeature.RefreshRate + " Hz)" : r < 0 ? "Unbegrenzt" : r + " FPS").ToList();
+        yield return new CycleWidget("Bildrate", Rates, () => Math.Max(0, Array.IndexOf(GameSettingsFeature.FrameRates, gs.FrameRate)), i => gs.SetFrameRate(GameSettingsFeature.FrameRates[i]))
+        {
+            Hint = "Das Spiel selbst begrenzt nie (im Menü über 250 FPS). \"Bildschirm\" folgt der Bildwiederholrate. Mit VSync zählt immer der Monitor.",
+        };
+        var backgroundRates = GameSettingsFeature.BackgroundFrameRates.Select(r => r == 0 ? "wie im Vordergrund" : r + " FPS").ToList();
+        yield return new CycleWidget("Bildrate im Hintergrund", backgroundRates, () => Math.Max(0, Array.IndexOf(GameSettingsFeature.BackgroundFrameRates, gs.BackgroundFrameRate)), i => gs.SetBackgroundFrameRate(GameSettingsFeature.BackgroundFrameRates[i]))
+        {
+            Hint = "Weniger Bilder, solange das Fenster nicht im Vordergrund ist (spart Strom und Lüfter, z. B. beim Streamen).",
         };
         yield return new ToggleWidget("VSync", () => gs.VSync, gs.SetVSync);
         yield return new CycleWidget("Qualität", () => QualitySettings.names, () => gs.Quality, gs.SetQuality);
@@ -432,6 +516,53 @@ public sealed class ModMenuFeature : FeatureBase
 
         yield return new HeaderWidget("Intro");
         foreach (var row in Settings("SkipIntro", "SkipLogos", "Logos überspringen", "SkipIntro", "SkipShowIntro", "Show-Intro überspringen", "SkipIntro", "NoTutorialPrompt", "Keine Tutorial-Frage"))
+        {
+            yield return row;
+        }
+
+        yield return new HeaderWidget("Überspringen und Vorlauf");
+        var skip = Context.Get<SkipFeature>();
+        if (skip != null)
+        {
+            yield return new InfoWidget(() => "In der Show: " + skip.Key.Value + " (oder rechter Stick drücken) tippen überspringt Video oder Satz, halten spult vor.", 2);
+            yield return new KeyCaptureWidget("Taste", () => skip.Key.Value, k =>
+            {
+                skip.Key.Value = k.ToString();
+                return true;
+            });
+        }
+
+        foreach (var row in Settings("Skip", "Enabled", "Überspringen an", "Skip", "Speed", "Vorlauf-Tempo", "Skip", "AutoSkipVideos", "Antwortvideos immer überspringen"))
+        {
+            yield return row;
+        }
+
+        yield return new HeaderWidget("Finale");
+        foreach (var row in Settings("MasterBet", "FreeAmount", "Freier Einsatz (mittlere Wahl, B)", "MasterBet", "Step", "Schritt in Euro"))
+        {
+            yield return row;
+        }
+
+        yield return new HeaderWidget("Publikumsjoker");
+        var joker = Context.Get<JokerFeature>();
+        if (joker != null)
+        {
+            var accuracies = new[] { JokerFeature.PerMember, 50, 70, 90, JokerFeature.AlwaysRight };
+            var names = new List<string> { "je nach Zuschauer (50-100 %)", "50 %", "70 %", "90 %", "immer richtig (Original)" };
+            yield return new CycleWidget("Trefferquote", names, () => Math.Max(0, Array.IndexOf(accuracies, joker.Accuracy.Value)), i => joker.Accuracy.Value = accuracies[i])
+            {
+                Hint = "Im Original liegt der Joker wegen eines Fehlers immer richtig. Das Spiel gibt jedem Zuschauer eine eigene Zuverlässigkeit.",
+            };
+        }
+
+        yield return new HeaderWidget("Schätzfrage");
+        foreach (var row in Settings("Estimate", "HideOtherTeam", "Zahl des anderen Teams verdecken", "Estimate", "Tie", "Gleichstand"))
+        {
+            yield return row;
+        }
+
+        yield return new HeaderWidget("Kapitäne");
+        foreach (var row in Settings("Captains", "NoAnswerHints", "Keine Antwort-Hinweise", "Captains", "AiSaysWhatItPicks", "KI wählt, was sie lobt"))
         {
             yield return row;
         }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using WWDS.ModCore.Model;
 
 namespace WWDS.ModCore.Input;
@@ -41,15 +42,18 @@ public static class KeyboardLayout
 {
     private static readonly PadButton[] Answers = { PadButton.Y, PadButton.B, PadButton.A };
     private static readonly PadButton[] Bets = { PadButton.LB, PadButton.A, PadButton.B, PadButton.Y, PadButton.RB };
-    private static readonly string[] P2Answers = { "X", "C", "V" };
-
-    /// <summary>Every key name (UnityEngine.KeyCode) the layout reads.</summary>
-    public static readonly string[] Keys =
+    private static readonly string[] FixedKeys =
     {
-        "Return", "KeypadEnter", "Space", "X", "C", "V",
+        "Return", "KeypadEnter", "Space",
         "Alpha0", "Alpha1", "Alpha2", "Alpha3", "Alpha4", "Alpha5",
         "Keypad0", "Keypad1", "Keypad2", "Keypad3", "Keypad4", "Keypad5",
     };
+
+    /// <summary>Player 2's answer keys A, B, C with two keyboard players (rebindable, default X C V).</summary>
+    public static string[] P2AnswerKeys { get; set; } = { "X", "C", "V" };
+
+    /// <summary>Every key name (UnityEngine.KeyCode) the layout reads.</summary>
+    public static string[] Keys => FixedKeys.Concat(P2AnswerKeys).Distinct().ToArray();
 
     /// <summary>Presses for the keys that went down this frame during a show.</summary>
     public static List<KeyboardPress> Map(GamePhase phase, bool twoKeyboards, ICollection<string> down)
@@ -64,9 +68,9 @@ public static class KeyboardLayout
         if (digit == 0 && question) result.Add(new KeyboardPress(0, PadButton.LB));
         if (twoKeyboards && question)
         {
-            for (var i = 0; i < P2Answers.Length; i++)
+            for (var i = 0; i < P2AnswerKeys.Length && i < Answers.Length; i++)
             {
-                if (down.Contains(P2Answers[i])) result.Add(new KeyboardPress(1, Answers[i]));
+                if (down.Contains(P2AnswerKeys[i])) result.Add(new KeyboardPress(1, Answers[i]));
             }
         }
 

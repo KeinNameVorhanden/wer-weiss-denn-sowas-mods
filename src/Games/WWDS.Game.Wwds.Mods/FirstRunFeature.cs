@@ -24,8 +24,17 @@ public sealed class FirstRunFeature : FeatureBase
     private static readonly string[][] Modules =
     {
         new[] { "Komfort", SkipIntroFeature.FeatureId, "Intro überspringen", "Die Logo-Videos beim Start werden übersprungen (das Show-Intro auf Wunsch auch)." },
+        new[] { "Komfort", SkipFeature.FeatureId, "Überspringen", "In der Show Tab (oder rechten Stick) tippen: Antwortvideo oder Satz überspringen; halten: Vorlauf." },
+        new[] { "Komfort", MasterBetFeature.FeatureId, "Freier Einsatz", "Im Finale ist die mittlere Wahl (B) ein freier Betrag: hoch/runter oder Mausrad ändern ihn." },
+        new[] { "Komfort", CaptainHintsFeature.FeatureId, "Faire Kapitäne", "Elton und Höcker verraten mit ihren Sprüchen nicht mehr die Antwort; die KI wählt, was sie lobt." },
+        new[] { "Komfort", VideoFixFeature.FeatureId, "Stabile Videos", "Antwortvideos warten auf ihr erstes Bild; ein hängendes Video wird neu gestartet und sonst übersprungen." },
+        new[] { "Komfort", JokerFeature.FeatureId, "Publikumsjoker", "Das Publikum kann sich irren (wie vom Spiel vorgesehen); kein Hängenbleiben bei der Auswahl." },
+        new[] { "Komfort", EstimateFeature.FeatureId, "Faire Schätzfrage", "Die Zahl des anderen Teams bleibt bis zur Auflösung verdeckt; bei Gleichstand gewinnt, wer zuerst eingeloggt hat." },
+        new[] { "Komfort", SaveBackupFeature.FeatureId, "Spielstand-Sicherung", "Sichert die Spielstände bei jedem Start, stellt sie wieder her und spiegelt sie auf Wunsch in einen Cloud-Ordner." },
+        new[] { "Komfort", UltrawideFeature.FeatureId, "Breitbild", "Auf 21:9-Bildschirmen passen die Menüs in die Höhe (sonst abgeschnitten); auf Wunsch 16:9 mit Rändern." },
         new[] { "Komfort", QuickplayFeature.FeatureId, "Schnellstart", "Die Spielerauswahl füllt sich selbst: Tastatur gegen KI, Aufstellung im Mod-Menü." },
         new[] { "Komfort", InputDevicesFeature.FeatureId, "Eingabegeräte", "Zwei Spieler an einer Tastatur, mehr Controller (z. B. GuliKit, Switch-Modus), sichere Namenseingabe." },
+        new[] { "Komfort", KeyBindingsFeature.FeatureId, "Tastenbelegung", "Jede Taste beider Tastaturspieler frei belegen (Mod-Menü, Seite Tasten); die Tastensymbole passen sich an." },
         new[] { "Komfort", MouseFeature.FeatureId, "Maussteuerung", "Klicken, Zeigen und Mausrad in allen Menüs und in der Show." },
         new[] { "Komfort", KeyboardFeature.FeatureId, "Tastenkürzel", "Enter bestätigt überall, 1/2/3 Antwort, 1-5 Einsatz, 0 Publikumsjoker. Zu zweit: Spieler 2 hat Leertaste und X/C/V." },
         new[] { "Komfort", EscMenuFeature.FeatureId, "ESC-Menü", "Escape: Fortsetzen, Speichern, Einstellungen, Hauptmenü, Beenden." },

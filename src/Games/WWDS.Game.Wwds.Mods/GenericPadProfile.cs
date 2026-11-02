@@ -15,7 +15,8 @@ public sealed class GenericPadProfile : UnityInputDeviceProfile
         Name = "Generic Gamepad (WWDS mod)";
         Meta = "Unknown gamepad, positional layout";
         DeviceClass = InputDeviceClass.Controller;
-        DeviceStyle = InputDeviceStyle.Unknown;
+        // Xbox symbols (A bottom, B right, ...) match the positional layout; "Unknown" showed keyboard keys.
+        DeviceStyle = InputDeviceStyle.XboxOne;
         IncludePlatforms = new[] { "Windows" };
         LastResortRegex = ".+";
         ButtonMappings = new[]

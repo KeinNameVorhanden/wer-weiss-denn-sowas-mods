@@ -29,6 +29,9 @@ public sealed class InputDevicesFeature : FeatureBase
     private IConfigValue<bool> _xboxNames = null!;
     private IConfigValue<bool> _genericPads = null!;
     private IConfigValue<bool> _swapAB = null!;
+    private IConfigValue<float> _deadZone = null!;
+    private IConfigValue<bool> _joinHint = null!;
+    private ModUi _ui = null!;
     private bool _logged;
 
     public override string Id => FeatureId;
@@ -45,8 +48,16 @@ public sealed class InputDevicesFeature : FeatureBase
         _xboxNames = Context.Config.Bind("Input", "AnyXInputName", true, "Treat every pad named \"Controller (...)\" (Windows' name for XInput pads, e.g. GuliKit or 8BitDo in X mode) as an Xbox controller.");
         _genericPads = Context.Config.Bind("Input", "GenericControllers", true, "Give unknown gamepads (Switch Pro, GuliKit/8BitDo in Switch or DInput mode, USB pads) a standard layout instead of ignoring them.");
         _swapAB = Context.Config.Bind("Input", "GenericSwapAB", false, "Unknown gamepads: swap the bottom and right face buttons (A/B). Takes effect after a restart.");
+        _deadZone = Context.Config.Bind("Input", "StickDeadZone", 0.3f, "Gamepad sticks: movement below this share is ignored (stops worn sticks from scrolling menus by themselves; game default 0.2).");
+        _joinHint = Context.Config.Bind("Input", "JoinHint", true, "Show the join keys of every device on the player selection screen.");
         _current = this;
         var ui = ModUi.For(Context);
+        _ui = ui;
+        Track(ui.OnState(state =>
+        {
+            if (state == "StateScreenSelectPlayers" && _joinHint.Value) ui.Toast(JoinHint(), 20, "join-hint");
+            else ui.DismissToast("join-hint");
+        }));
         var none = ModCore.Capabilities.GameCapability.None;
         ui.Patch(new PatchSpec("mods.input.keyboard-dedupe", "Drop the second keyboard device with the same layout.",
             () => AccessTools.Method(typeof(InputManager), nameof(InputManager.AttachDevice), new[] { typeof(InputDevice) }), none)
@@ -89,6 +100,7 @@ public sealed class InputDevicesFeature : FeatureBase
         if (_logged || !InputManager.IsSetup || InputManager.Devices.Count == 0) return;
         _logged = true;
         LogDevices("Input devices at start");
+        foreach (var device in InputManager.Devices) ApplyDeadZone(device);
     }
 
     private static bool Fix => _current != null && _current._fixKeyboards.Value;
@@ -96,6 +108,26 @@ public sealed class InputDevicesFeature : FeatureBase
     private void OnAttached(InputDevice device)
     {
         if (_logged) Log.Info("Device attached: " + Describe(device));
+        ApplyDeadZone(device);
+    }
+
+    private void ApplyDeadZone(InputDevice device)
+    {
+        if (device is DeviceKeyboard) return;
+        var zone = Mathf.Clamp(_deadZone.Value, 0.05f, 0.8f);
+        foreach (var stick in new[] { device.LeftStick, device.RightStick })
+        {
+            if (stick != null && stick.LowerDeadZone < zone) stick.LowerDeadZone = zone;
+        }
+    }
+
+    /// <summary>Join keys per device, following the key bindings.</summary>
+    private string JoinHint()
+    {
+        var keys = Context.Get<KeyBindingsFeature>();
+        string K(int player, string button) => WWDS.ModCore.Input.KeyBindings.Label(keys?.Get(player, button) ?? WWDS.ModCore.Input.KeyBindings.Default(player, button));
+        return "Beitreten: Tastatur 1 mit " + K(1, "LB") + " (Team Höcker) / " + K(1, "RB") + " (Team Elton), Tastatur 2 mit "
+            + K(2, "LB") + " / " + K(2, "RB") + ", Controller mit LB / RB, Maus: linke / rechte Bildhälfte klicken.";
     }
 
     private void OnDetached(InputDevice device) => Log.Info("Device detached: " + Describe(device));

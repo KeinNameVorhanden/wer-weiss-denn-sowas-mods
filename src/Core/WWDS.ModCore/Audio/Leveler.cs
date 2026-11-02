@@ -26,6 +26,8 @@ public sealed class Leveler
     private long _measured;
     private float _envelope;
     private float _inputScale = 1f;
+    private int _fadeLeft;
+    private int _fadeTotal;
 
     public Leveler(int sampleRate) => _sampleRate = Math.Max(8000, sampleRate);
 
@@ -67,8 +69,13 @@ public sealed class Leveler
             _shortMs = 0f;
             _sumSq = 0;
             _measured = 0;
+            _fadeTotal = (int)(_sampleRate * FadeInSeconds * 2);
+            _fadeLeft = _fadeTotal;
         }
     }
+
+    /// <summary>Soft start of every line (the recordings often begin mid-sound): 10 ms fade-in.</summary>
+    public float FadeInSeconds { get; set; } = 0.01f;
 
     /// <summary>Speech level of the line so far (dBFS), or null when less than half a second was above the gate.</summary>
     public float? Finish()
@@ -118,6 +125,12 @@ public sealed class Leveler
             for (var i = 0; i < data.Length; i++)
             {
                 var x = data[i] * (from + ((to - from) * i / data.Length));
+                if (_fadeLeft > 0)
+                {
+                    x *= 1f - ((float)_fadeLeft / _fadeTotal);
+                    _fadeLeft--;
+                }
+
                 var a = Math.Abs(x);
                 _envelope = a > _envelope ? a : (_envelope * release) + (a * (1f - release));
                 if (_envelope > ceiling) x *= ceiling / _envelope;

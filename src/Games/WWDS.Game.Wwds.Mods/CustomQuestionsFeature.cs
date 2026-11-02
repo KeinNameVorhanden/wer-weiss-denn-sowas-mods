@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Beardshaker.BeardBase.AssetBundleManager;
-using DoozyUI;
 using HarmonyLib;
 using UnityEngine;
-using UnityEngine.Video;
 using WWDS.ModCore.Config;
 using WWDS.ModCore.Content;
 using WWDS.ModCore.Features;
@@ -100,11 +98,10 @@ public sealed class CustomQuestionsFeature : FeatureBase
         {
             Prefix = AccessTools.Method(typeof(CustomQuestionsFeature), nameof(VideoFilePrefix)),
         });
-        _ui.Patch(new PatchSpec("mods.questions.video-skip", "A pack question without (working) video skips the video instead of waiting forever.",
+        _ui.Patch(new PatchSpec("mods.questions.video-skip", "A pack question without video skips the video instead of waiting forever.",
             () => AccessTools.Method(typeof(SVideoController), nameof(SVideoController.PlayAndWait)), none)
         {
             Prefix = AccessTools.Method(typeof(CustomQuestionsFeature), nameof(PlayAndWaitPrefix)),
-            Postfix = AccessTools.Method(typeof(CustomQuestionsFeature), nameof(PlayAndWaitPostfix)),
         });
         _ui.Patch(new PatchSpec("mods.questions.trophies", "No Steam achievements in pack shows.",
             () => AccessTools.Method(typeof(SPlayerStatistics), nameof(SPlayerStatistics.UnlockTrophy)), none)
@@ -411,41 +408,6 @@ public sealed class CustomQuestionsFeature : FeatureBase
         if (!string.IsNullOrEmpty(path) && (!path.StartsWith(Marker, StringComparison.Ordinal) || self.VideoFile(path) != null)) return true;
         __result = Pause(0f);
         return false;
-    }
-
-    private static void PlayAndWaitPostfix(string path, ref IEnumerator __result)
-    {
-        var self = _current;
-        if (self?._session != null && path != null && path.StartsWith(Marker, StringComparison.Ordinal)) __result = self.Watchdog(__result, path);
-    }
-
-    /// <summary>A video that never starts (broken file, unsupported codec) is stopped after a few seconds.</summary>
-    private IEnumerator Watchdog(IEnumerator original, string path)
-    {
-        var start = Time.realtimeSinceStartup;
-        var started = false;
-        while (original.MoveNext())
-        {
-            if (!started)
-            {
-                var player = Player();
-                started = player != null && (player.isPlaying && player.time > 0.05);
-                if (!started && Time.realtimeSinceStartup - start > 6f && !(UIManager.Instance != null && UIManager.Instance.gamePaused))
-                {
-                    Log.Warn("Video " + path + " did not start, skipped (use H.264 .mp4)");
-                    SVideoController.Instance.Stop();
-                }
-            }
-
-            yield return original.Current;
-        }
-    }
-
-    private static VideoPlayer? Player()
-    {
-        var controller = SVideoController.Instance;
-        var pc = controller == null ? null : AccessTools.Field(typeof(SVideoController), "videoPlayer").GetValue(controller);
-        return pc == null ? null : AccessTools.Field(typeof(VideoPlayerPC), "player").GetValue(pc) as VideoPlayer;
     }
 
     private static bool TrophyPrefix() => _current?._session == null;

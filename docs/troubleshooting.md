@@ -8,6 +8,10 @@
 | A gamepad does nothing | `BepInEx/LogOutput.log`: `Input devices at start` and `Device attached` lines; `unknown profile` means the game has no layout for it | Keep `[Input] AnyXInputName` and `GenericControllers` on (default). If A and B are swapped: `GenericSwapAB = true`, restart. Alternative without mods: enable Steam Input for the game. |
 | An own question pack is missing | Mod menu > Inhalte lists every pack with its errors (file and line) | Fix the listed lines, then "Pakete neu laden". A show needs 12 questions, a final and an estimate. |
 | An own voice line is not used | Log: `Own voice line ... could not be loaded`; file name must equal the line name | `.ogg` or `.wav` only; show lines need a `showN` folder to apply to one show. "Satzliste exportieren" lists the names. |
+| Answer video stays black or the show waits after an answer | Log: `Video ... did not start` | `[Video] Watchdog` (default on) restarts it once and then skips it. Tab skips any video by hand. |
+| Fans loud, graphics card busy in the menu | The game has no frame limit | `[Game] FrameRateLimit` (default 60) applies always; check it is not -1. |
+| Menus cut off on a 21:9 screen | | Mod menu > Spiel > Breitbild: "Menüs passen in die Höhe" (default) or 16:9 with side bars. |
+| Want an old save back | `BepInEx/wwds/backups` holds one folder per start | Mod menu > Inhalte > Wiederherstellen, then restart the game. |
 | Game stops when alt-tabbing | Unity pauses unfocused games. | `[General] RunInBackground = true`. |
 | Twitch: bridge says `rejected a connection: bad handshake` | Key mismatch | Start the bridge once so `%LOCALAPPDATA%\WWDS\bridge.key` exists, then restart the game. |
 | Twitch: `No bridge key` warning | Bridge never started | Start `WWDS.Bridge.exe` once. |

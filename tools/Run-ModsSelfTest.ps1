@@ -11,14 +11,14 @@
 .PARAMETER Game         Game1 or Game2.
 .PARAMETER Timeout      Seconds before the game is closed.
 .PARAMETER NoStage      Skip staging (use the current artifacts/payload).
-.PARAMETER Mode         Full | Screens (menu captures) | Catalogue (show 31 from the other game) | Custom (a temporary own question pack) | Long (long show with 2 short boards, resume).
+.PARAMETER Mode         Full | Screens (menu captures) | Catalogue (show 31 from the other game) | Custom (a temporary own question pack) | Long (long show with 2 short boards, resume) | Frames (frame pacing in the main menu) | Ultrawide (21:9 window).
 .PARAMETER RestoreOnly  Only undo an interrupted run.
 #>
 param(
     [ValidateSet('Game1', 'Game2')][string]$Game = 'Game1',
     [int]$Timeout = 420,
     [switch]$NoStage,
-    [ValidateSet('Full', 'Screens', 'Catalogue', 'Custom', 'Long')][string]$Mode = 'Full',
+    [ValidateSet('Full', 'Screens', 'Catalogue', 'Custom', 'Long', 'Frames', 'Ultrawide')][string]$Mode = 'Full',
     [string]$ScreenshotDir = '',
     [switch]$RestoreOnly
 )
@@ -64,6 +64,7 @@ $testKeys = @(
     @('Catalogue', 'OtherGameShows', 'true'),
     @('LongGame', 'Boards', $(if ($Mode -eq 'Long') { '2' } else { '1' })),
     @('LongGame', 'Source', 'NextUnplayed'),
+    @('Display', 'Ultrawide', 'Auto'),
     @('Quickplay', 'QuickResume', 'true'),
     @('Opponent', 'Active', 'false'),
     @('Debug', 'AutoStartShow', 'false')
@@ -222,7 +223,7 @@ Add-Type -Namespace WwdsTest -Name Win -MemberDefinition @'
 $previous = [WwdsTest.Win]::GetForegroundWindow()
 
 # The self-test keeps the game silent; here: a window that stays behind whatever you are doing.
-$size = if ($Mode -eq 'Screens') { @('1920', '1080') } else { @('1280', '720') }
+$size = if ($Mode -eq 'Screens') { @('1920', '1080') } elseif ($Mode -eq 'Ultrawide') { @('1680', '720') } else { @('1280', '720') }
 $gameArgs = @('-screen-fullscreen', '0', '-screen-width', $size[0], '-screen-height', $size[1])
 $started = Get-Date
 $aborted = $false
@@ -234,7 +235,7 @@ try {
         $proc.Refresh()
         $hwnd = $proc.MainWindowHandle
         if ($hwnd -ne [IntPtr]::Zero) {
-            if ($Mode -eq 'Screens') {
+            if ($Mode -eq 'Screens' -or $Mode -eq 'Frames' -or $Mode -eq 'Ultrawide') {
                 # Screenshots need a rendered window: visible, at the bottom, not active.
                 [void][WwdsTest.Win]::ShowWindow($hwnd, 4)
                 [void][WwdsTest.Win]::SetWindowPos($hwnd, [IntPtr]1, 0, 0, 0, 0, 0x0013)

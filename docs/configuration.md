@@ -18,13 +18,22 @@ Bridge settings are in `%LOCALAPPDATA%\WWDS\bridge.json` (see `docs/twitch-setup
 | `[WhoWins]` | Bet on the winner at show start | `ChatBets`, `TwitchPrediction` (channel points), `WindowSeconds`, `StreamerLabel`, `PlayerLabel`, `AiLabel`, `TwitchLabel` |
 | `[Adapter]` | Game-side deadlines for audience decisions | `AnswerDecisionTimeout`, `MasterDecisionTimeout` (keep below 20 s), `BetDecisionTimeout`, `EstimateDecisionTimeout`, `CategoryDecisionTimeout` |
 | `[Statistics]` | Local statistics | `SaveToDisk` (BepInEx/wwds/statistics.json) |
-| `[Game]` | General game settings (see [mods.md](mods.md)) | `ManageDisplay`, `Resolution` (e.g. 1920x1080), `WindowMode` (Fullscreen/Borderless/Windowed), `FrameRateLimit` (-1 = unlimited), `VSync`, `QualityLevel` (-1 = keep), `ApplySavedVolumesAtStart`, `MuteMusic`, `MuteSfx`, `MuteVoice`, `MasterVolume` (0-1), `MuteInBackground`, `AudienceVolume` (0-1, applause and crowd), `VideoVolume` (0-2.5, answer videos) |
+| `[Game]` | General game settings (see [mods.md](mods.md)) | `ManageDisplay`, `Resolution` (e.g. 1920x1080), `WindowMode` (Fullscreen/Borderless/Windowed), `FrameRateLimit` (always applied; 0 = monitor refresh rate, -1 = unlimited), `BackgroundFrameRate` (0 = same), `VSync`, `QualityLevel` (-1 = keep), `ApplySavedVolumesAtStart`, `MuteMusic`, `MuteSfx`, `MuteVoice`, `MasterVolume` (0-1), `MuteInBackground`, `AudienceVolume` (0-1, applause and crowd), `VideoVolume` (0-2.5, answer videos) |
 | `[SkipIntro]` | Intro skipping | `SkipLogos`, `SkipShowIntro`, `NoTutorialPrompt` |
 | `[Catalogue]` | Other game's shows as 31-60 | `OtherGameShows` (next start) |
 | `[Questions]` | Own question packs as shows 101+ (see [own-content.md](own-content.md)) | `OwnPacks` |
 | `[LongGame]` | Shows with several boards | `Boards` (1-4), `Source` (NextUnplayed/Random/OwnPacks/OtherGame), `JokerPerBoard` |
-| `[Voice]` | Voice lines and normalization | `WaitForSameSpeaker`, `MaxWaitSeconds`, `WaitForRealEnd`, `KeepHostOnInput`, `AudienceDuck` (0-1), `Normalize`, `TargetLevelDb`, `MaxBoostDb`, `OwnLines` (BepInEx/wwds/voices) |
-| `[Input]` | Keyboards and gamepads | `FixKeyboards` (one device per keyboard layout, Escape for both, safe name typing), `AnyXInputName`, `GenericControllers`, `GenericSwapAB` |
+| `[Voice]` | Voice lines and normalization | `WaitForSameSpeaker`, `MaxWaitSeconds`, `WaitForRealEnd`, `KeepHostOnInput`, `AudienceDuck` (0-1), `RememberHeardLines`, `Normalize`, `TargetLevelDb`, `MaxBoostDb`, `OwnLines` (BepInEx/wwds/voices) |
+| `[Input]` | Keyboards and gamepads | `FixKeyboards` (one device per keyboard layout, Escape for both, safe name typing), `AnyXInputName`, `GenericControllers`, `GenericSwapAB`, `StickDeadZone`, `JoinHint` |
+| `[Keys]` | Key bindings of both keyboard players | `P1Up` ... `P1RB`, `P2Up` ... `P2RB`, `P2AnswerA/B/C` (UnityEngine.KeyCode names) |
+| `[Skip]` | Skip key in a show | `Enabled`, `Key` (Tab), `Speed` (2-10), `AutoSkipVideos` |
+| `[MasterBet]` | Final bet | `FreeAmount`, `Step` (EUR) |
+| `[Estimate]` | Estimate question | `HideOtherTeam`, `Tie` (FirstLoggedIn/TeamB) |
+| `[Captains]` | Captain remarks and AI | `NoAnswerHints`, `AiSaysWhatItPicks` |
+| `[Joker]` | Audience joker | `Accuracy` (0 = per audience member, 1-99 %, 100 = always right) |
+| `[Video]` | Answer videos | `Watchdog`, `StartTimeoutSeconds` |
+| `[Saves]` | Save backups | `BackupAtStart`, `KeepBackups`, `MirrorFolder` (cloud sync folder) |
+| `[Display]` | Ultrawide | `Ultrawide` (Off/Auto/Pillarbox) |
 | `[Quickplay]` | Configured line-up instead of the selection | `Enabled`, `TeamA1`, `TeamA2`, `TeamB1`, `TeamB2` (Empty/Keyboard/Gamepad1-4/Bot/Twitch), `TeamA1Character` ... (-1 = first free), `ShowId`, `CountdownSeconds`, `QuickResume` |
 | `[Mouse]` | Mouse support | `Enabled`, `Owner` (KeyboardPlayer/ActivePlayer), `HideAfterSeconds` |
 | `[EscMenu]` | ESC menu | `ReplacePauseMenu`, `Hotkey` (Escape), `ConfirmQuitDoor` |

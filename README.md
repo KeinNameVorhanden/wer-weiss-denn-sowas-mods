@@ -16,9 +16,14 @@ Comfort mods and Twitch audience play for the PC games **"Wer weiß denn sowas? 
   game AI, Twitch) with fixed characters, and starts right away.
 - **Mouse support** on every screen: click answers, categories, bets, prompts; wheel for estimates,
   character browsing, lists.
-- **Two players on one keyboard**, keyboard shortcuts (Enter confirms everywhere, digits answer and bet).
+- **Two players on one keyboard**, keyboard shortcuts, **free key bindings** with matching key symbols.
 - **More gamepads**: XInput pads with any name (e.g. GuliKit) and pads in Switch/DInput mode.
 - **Skip intro**: logo videos, optionally the show intro and the tutorial question.
+- **Skip and fast-forward** in a show: tap Tab to skip a video or line, hold to fast-forward.
+- **Fairer rules**: free final bet, captains no longer give answers away, the audience joker can be
+  wrong as designed, hidden estimates with a clear tie rule.
+- **Fixes**: frame rate limit (the game runs uncapped), stuck or black answer videos, ultrawide menus,
+  save backups with an optional cloud folder.
 - **Game settings**: master volume, mute in background, real mute per channel, resolution, window mode,
   frame rate, VSync, quality, UI scale.
 - **Both catalogues**: own both games and each offers the other game's 30 shows as shows 31-60.

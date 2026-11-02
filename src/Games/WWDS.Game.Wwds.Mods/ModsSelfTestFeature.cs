@@ -61,6 +61,7 @@ public sealed class ModsSelfTestFeature : FeatureBase
     protected override string LogCategoryName => "Mods";
 
     private ModCore.Config.IConfigValue<string> _mode = null!;
+    private List<double>? _frames;
     private ModCore.Config.IConfigValue<string> _shots = null!;
 
     protected override void OnStart()
@@ -116,6 +117,18 @@ public sealed class ModsSelfTestFeature : FeatureBase
             return;
         }
 
+        if (_mode.Value == "Frames")
+        {
+            BuildFrames();
+            return;
+        }
+
+        if (_mode.Value == "Ultrawide")
+        {
+            BuildUltrawide();
+            return;
+        }
+
         Do("mod menu pages build", () =>
         {
             var menu = Context.Get<ModMenuFeature>() ?? throw new InvalidOperationException("ModMenu feature not running");
@@ -134,6 +147,32 @@ public sealed class ModsSelfTestFeature : FeatureBase
             return string.Join(", ", report.ToArray());
         });
         Wait(1);
+        Do("rebound key reaches the keyboard and its key symbol", () =>
+        {
+            var keys = Context.Get<KeyBindingsFeature>() ?? throw new InvalidOperationException("KeyBindings feature not running");
+            var before = keys.Get(1, "A");
+            var beforeLb = keys.Get(2, "LB");
+            try
+            {
+                keys.Set(1, "A", KeyCode.N);
+                keys.Set(2, "LB", KeyCode.Tab);
+                var device = InputManager.Devices.OfType<DeviceKeyboard>().First(k => k.DeviceId == 0);
+                var field = (KeyCode)HarmonyLib.AccessTools.Field(typeof(DeviceKeyboard), "A").GetValue(device);
+                if (field != KeyCode.N) throw new InvalidOperationException("device key A is " + field);
+                var sprite = SDataStore.Instance.GetSpriteFaceForButton(ButtonStyles.KeyboardOne, ButtonFaces.A);
+                if (sprite == null || !sprite.name.StartsWith("WWDS_Key_", StringComparison.Ordinal)) throw new InvalidOperationException("symbol " + (sprite == null ? "null" : sprite.name));
+                var both = SDataStore.Instance.GetSpriteFaceForButton(ButtonStyles.KeyboardTwo, ButtonFaces.LB, true);
+                var dir = Application.temporaryCachePath;
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "selftest-key-a.png"), sprite.texture.EncodeToPNG());
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "selftest-key-lb.png"), both.texture.EncodeToPNG());
+                return sprite.name + ", " + both.name + " (" + dir + ")";
+            }
+            finally
+            {
+                keys.Set(1, "A", (KeyCode)Enum.Parse(typeof(KeyCode), before));
+                keys.Set(2, "LB", (KeyCode)Enum.Parse(typeof(KeyCode), beforeLb));
+            }
+        });
         Do("esc menu opens on the door screen", () =>
         {
             var esc = Context.Get<EscMenuFeature>()!;
@@ -261,6 +300,28 @@ public sealed class ModsSelfTestFeature : FeatureBase
         Add("vote window shows the audience vote", 5, () => Context.Get<VoteHudFeature>()!.Visible);
         Do("capture live vote window", () => Capture("hud_live.png"));
         Add("answer A locked", 10, () => _locked != null && _locked.OptionIndex == 0);
+        Add("answer video starts", 120, () => Context.Get<SkipFeature>()!.VideoRunning);
+        Do("tap skips the answer video", () =>
+        {
+            Context.Get<SkipFeature>()!.TestTap();
+            return "tapped";
+        });
+        Add("answer video ended", 5, () => !Context.Get<SkipFeature>()!.VideoRunning);
+        var scaleBefore = 1f;
+        Do("hold fast-forwards", () =>
+        {
+            scaleBefore = Time.timeScale;
+            Context.Get<SkipFeature>()!.TestHold(true);
+            if (Time.timeScale < 2f) throw new InvalidOperationException("timeScale " + Time.timeScale);
+            return "timeScale " + Time.timeScale;
+        });
+        Wait(1);
+        Do("release restores the speed", () =>
+        {
+            Context.Get<SkipFeature>()!.TestHold(false);
+            if (Math.Abs(Time.timeScale - scaleBefore) > 0.01f) throw new InvalidOperationException("timeScale " + Time.timeScale + ", was " + scaleBefore);
+            return "timeScale " + Time.timeScale;
+        });
         Do("wait for the next human turn", () =>
         {
             _categoryTurn = false;
@@ -418,12 +479,109 @@ public sealed class ModsSelfTestFeature : FeatureBase
             return "ok";
         });
         PressUntil("final question after the last board", 600, () => SDataAccess.ActiveSession!.GetActiveQuestionData().EQUESTIONTYPE != EQuestionType.Question);
+        Team? human = null;
+        var expected = 0;
+        Add("the keyboard team bets with a free amount", 120, () =>
+        {
+            var s = SDataAccess.ActiveSession!;
+            human = s.TeamA[0] is PlayerAgentLocal ? s.TeamA : s.TeamB;
+            return Context.Get<MasterBetFeature>()!.AmountFor(human) != null;
+        });
+        Do("raise the free amount by two steps and log it in with B", () =>
+        {
+            var bet = Context.Get<MasterBetFeature>()!;
+            bet.TestAdjust(human!, 2);
+            expected = bet.AmountFor(human!)!.Value;
+            _ui.Pad.Press(VirtualPad.Keyboard!, InputControlType.Action2);
+            return "free amount " + expected + " of " + human!.GetScore();
+        });
+        Add("the team bets exactly that amount", 10, () => human!.GetBet() == expected);
         Do("back to the main menu", () =>
         {
             Context.Get<EscMenuFeature>()!.EndShow();
             return "ok";
         });
         Add("main menu at the end", 60, () => _ui.State == "StateScreenMainMenu");
+    }
+
+    /// <summary>Frame pacing of the game's own cap (60) and of other targets, measured in the main menu.</summary>
+    private void BuildFrames()
+    {
+        var originalRate = Application.targetFrameRate;
+        var originalSync = QualitySettings.vSyncCount;
+        foreach (var target in new[] { 0, 144, 30, 60 })
+        {
+            var t = target;
+            Do("frames: cap " + (t == 0 ? "of the mod (window in the background)" : t.ToString()), () =>
+            {
+                if (t > 0)
+                {
+                    QualitySettings.vSyncCount = 0;
+                    Application.targetFrameRate = t;
+                }
+
+                return "targetFrameRate " + Application.targetFrameRate + ", vSync " + QualitySettings.vSyncCount;
+            });
+            Wait(1);
+            Do("frames: measure", () =>
+            {
+                _frames = new List<double>();
+                return "started";
+            });
+            Wait(5);
+            Do("frames: result " + (t == 0 ? "mod cap" : t.ToString()), () =>
+            {
+                var stats = FrameStats.From(_frames!);
+                _frames = null;
+                Log.Info("[SelfTest] frame pacing at targetFrameRate " + Application.targetFrameRate + ": " + stats);
+                var target = Application.targetFrameRate;
+                if (target > 0 && Math.Abs(stats.Fps - target) > target * 0.1) throw new InvalidOperationException("cap " + target + " not held: " + stats);
+                if (target <= 0) throw new InvalidOperationException("no frame cap active: " + stats);
+                return stats.ToString();
+            });
+        }
+
+        Do("frames: restore", () =>
+        {
+            Application.targetFrameRate = originalRate;
+            QualitySettings.vSyncCount = originalSync;
+            return "ok";
+        });
+    }
+
+    /// <summary>A 21:9 window: game canvases fit the height, the picture is pillarboxed to 16:9.</summary>
+    private void BuildUltrawide()
+    {
+        var wide = Context.Get<UltrawideFeature>() ?? throw new InvalidOperationException("Ultrawide feature not running");
+        Do("21:9 window", () =>
+        {
+            Screen.SetResolution(1680, 720, FullScreenMode.Windowed);
+            return "1680x720 requested";
+        });
+        Wait(2);
+        Do("window is wider than 16:9", () =>
+        {
+            var aspect = (float)Screen.width / Screen.height;
+            if (aspect < 2f) throw new InvalidOperationException(Screen.width + "x" + Screen.height);
+            return Screen.width + "x" + Screen.height;
+        });
+        Do("pillarbox on", () =>
+        {
+            wide.Mode.Value = UltrawideMode.Pillarbox;
+            return "ok";
+        });
+        Wait(1.5);
+        Add("game canvases fit the height", 5, () => wide.FittedCanvases > 0
+            && UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.CanvasScaler>().All(s => s.gameObject.name == "WWDS_ModUi" || s.uiScaleMode != UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize || s.screenMatchMode != UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight || s.matchWidthOrHeight >= 1f));
+        Add("3D picture pillarboxed to 16:9", 5, () => Camera.main != null && Math.Abs(Camera.main.rect.width * Screen.width / Screen.height - (16f / 9f)) < 0.05f);
+        Do("capture ultrawide menu", () => Capture("ultrawide.png"));
+        Do("back to Auto", () =>
+        {
+            wide.Mode.Value = UltrawideMode.Auto;
+            return "ok";
+        });
+        Wait(1.5);
+        Add("full width again in Auto", 5, () => Camera.main != null && Camera.main.rect.width > 0.99f);
     }
 
     private void BuildScreens()
@@ -528,6 +686,7 @@ public sealed class ModsSelfTestFeature : FeatureBase
 
     public override void Tick()
     {
+        _frames?.Add(Time.unscaledDeltaTime);
         if (_index >= _steps.Count) return;
         if (GameSettingsFeature.ForceMute && GameSettingsFeature.ListenerOverride == null && AudioListener.volume > 0f) AudioListener.volume = 0f;
         var now = Context.Clock.Now;

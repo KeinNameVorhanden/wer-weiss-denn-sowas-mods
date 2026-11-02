@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -451,3 +452,72 @@ public sealed class TextFieldWidget : Widget
         if (_edit.Length > _maxLength) _edit = _edit.Substring(0, _maxLength);
     }
 }
+
+/// <summary>A key binding: Enter or click waits for the next key, Escape cancels.</summary>
+public sealed class KeyCaptureWidget : Widget
+{
+    private static readonly KeyCode[] AllKeys = ((KeyCode[])Enum.GetValues(typeof(KeyCode)))
+        .Where(k => k != KeyCode.None && k < KeyCode.Mouse0).ToArray();
+
+    private readonly Func<string> _get;
+    private readonly Func<KeyCode, bool> _set;
+    private TextMeshProUGUI? _v;
+    private bool _waiting;
+    private int _startFrame;
+
+    public KeyCaptureWidget(string label, Func<string> get, Func<KeyCode, bool> set)
+        : base(label)
+    {
+        _get = get;
+        _set = set;
+    }
+
+    /// <summary>Marks the row (e.g. its key is also used elsewhere).</summary>
+    public Func<bool>? Warn { get; set; }
+
+    public override bool Capturing => _waiting;
+
+    protected override void BuildContent(float width)
+    {
+        base.BuildContent(width);
+        _v = ValueText(width);
+    }
+
+    public override void Refresh()
+    {
+        if (_waiting)
+        {
+            Set(_v, (int)(Time.unscaledTime * 2) % 2 == 0 ? "Taste drücken ..." : string.Empty);
+            if (_v != null) _v.color = GameStyle.Accent;
+            return;
+        }
+
+        var warn = Warn != null && Warn();
+        Set(_v, _get() + (warn ? "  (doppelt)" : string.Empty));
+        if (_v != null) _v.color = warn ? GameStyle.Accent : GameStyle.White;
+    }
+
+    public override void Submit()
+    {
+        _waiting = true;
+        _startFrame = Time.frameCount;
+    }
+
+    public override void CaptureInput()
+    {
+        if (!_waiting || Time.frameCount <= _startFrame + 1) return;
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            _waiting = false;
+            return;
+        }
+
+        foreach (var key in AllKeys)
+        {
+            if (!Input.GetKeyDown(key) || !_set(key)) continue;
+            _waiting = false;
+            return;
+        }
+    }
+}
+

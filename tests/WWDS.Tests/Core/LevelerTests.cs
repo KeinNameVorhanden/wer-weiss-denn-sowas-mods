@@ -88,6 +88,18 @@ public class LevelerTests
     }
 
     [Fact]
+    public void NewLine_StartsWithAShortFadeIn_InsteadOfAHardEdge()
+    {
+        var l = new Leveler(Rate);
+        l.Begin(-20f, 0f); // learned at the target: gain 0 dB
+        var data = Enumerable.Repeat(0.5f, Block * 2).ToArray();
+        l.Process(data, 2);
+        Assert.True(data[0] < 0.01f, "first sample " + data[0]);
+        Assert.InRange(data[Rate / 100 * 2 / 2], 0.2f, 0.3f); // halfway through the 10 ms ramp
+        Assert.Equal(0.5f, data[(Rate / 100 * 2) + 10], 3);
+    }
+
+    [Fact]
     public void ShortOrSilentLine_YieldsNoMeasurement()
     {
         var l = new Leveler(Rate);

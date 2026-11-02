@@ -25,7 +25,8 @@ public sealed class KeyboardFeature : FeatureBase
     /// <summary>Menu screens that read the A button but not Enter (the others poll Enter themselves).</summary>
     private static readonly string[] EnterStates = { "StateScreenSelectPlayers", "StateScreenTechMenu", "StateScreenArchiveMenu" };
 
-    private static readonly KeyCode[] Codes = KeyboardLayout.Keys.Select(k => (KeyCode)Enum.Parse(typeof(KeyCode), k)).ToArray();
+    private string[] _keyNames = new string[0];
+    private KeyCode[] _codes = new KeyCode[0];
     private readonly HashSet<string> _down = new();
     private IConfigValue<bool> _enabled = null!;
     private IConfigValue<bool> _twoPlayerKeys = null!;
@@ -67,9 +68,16 @@ public sealed class KeyboardFeature : FeatureBase
     private void ShowKeys(List<DeviceKeyboard> keyboards)
     {
         _down.Clear();
-        for (var i = 0; i < Codes.Length; i++)
+        var names = KeyboardLayout.Keys;
+        if (!names.SequenceEqual(_keyNames))
         {
-            if (Input.GetKeyDown(Codes[i])) _down.Add(KeyboardLayout.Keys[i]);
+            _keyNames = names;
+            _codes = names.Select(k => (KeyCode)Enum.Parse(typeof(KeyCode), k, true)).ToArray();
+        }
+
+        for (var i = 0; i < _codes.Length; i++)
+        {
+            if (Input.GetKeyDown(_codes[i])) _down.Add(_keyNames[i]);
         }
 
         if (_down.Count == 0) return;
